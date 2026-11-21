@@ -463,6 +463,18 @@ img.view3d { object-fit: contain; padding: 28px; }
 .scan-rahmen .e4 { right: 0; bottom: 0; border-left: 0; border-top: 0; border-radius: 0 0 14px 0; }
 .scan-fuss { position: absolute; left: 20px; right: 20px; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); z-index: 2; display: grid; justify-items: center; gap: 12px; color: var(--card); }
 .scan-text { font: 800 16px/22px var(--font); margin: 0; }
+
+/* ---------- Bezug als Kette ---------- */
+.bkette { position: relative; display: grid; gap: 4px; }
+.bkette::before { content: ""; position: absolute; left: 28.5px; top: 30px; bottom: 30px; width: 3px; background: var(--line-strong); border-radius: 2px; }
+.bglied { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 8px 12px; border: 1.5px solid transparent; border-radius: 16px; background: transparent; text-align: left; }
+.bglied .knoten { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 900 14px/1 var(--font); background: var(--card); box-shadow: inset 0 0 0 2px var(--line-strong); color: var(--ink); z-index: 1; flex: 0 0 auto; }
+.bglied .rest { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.bglied.eigen .knoten { box-shadow: none; border: 2px dashed var(--pri); color: var(--pri); }
+.bglied.gewaehlt { border-color: var(--pri); background: var(--pri-soft); }
+.bglied.gewaehlt .knoten { background: var(--pri); color: var(--card); box-shadow: none; border: 0; }
+.bglied .haken { color: var(--pri); display: grid; }
+.bglied:disabled { opacity: .4; cursor: default; }
 </style>
 </head>
 <body>
@@ -1119,7 +1131,7 @@ img.view3d { object-fit: contain; padding: 28px; }
   };
   const sichtbareAuftraege = () => (state.ich === "AG" ? state.auftraege : state.auftraege.filter(a => a.stationen.some(s => s.werkstatt === state.ich)));
 
-  /* Bezug: erlaubt und Vorschlag (Abschnitt 4.7, dazu Änderung 5: eigene Station) */
+  /* Bezug: welche Stationen wählbar sind (Abschnitt 4.7, dazu Änderung 5: eigene Station) */
   function erlaubt(a, art, nr, me) {
     if (nr === ende(a)) return false;
     if (me === 0) return nr >= 1;
@@ -1128,30 +1140,6 @@ img.view3d { object-fit: contain; padding: 28px; }
     if (art === "anpassung" || art === "gebraucht") return nr < me;
     if (art === "bedeutung") return nr > me;
     return true;
-  }
-  function vorschlag(a, art, bauteil, me) {
-    if (me === 0) { const j = jetzt(a); return j >= 1 && j <= anzahl(a) ? j : 1; }
-    if (art === "frage" || art === "vorschlag") return 0;
-    const b = a.bauteile.find(q => q.id === bauteil);
-    const v = b ? b.verlauf : [];
-    if (art === "anpassung" || art === "gebraucht") {
-      const frueher = v.filter(n => n < me);
-      return frueher.length ? frueher[frueher.length - 1] : Math.max(0, me - 1);
-    }
-    const spaeter = v.filter(n => n > me);
-    if (spaeter.length) return spaeter[0];
-    return me + 1 <= anzahl(a) ? me + 1 : me;
-  }
-  function bezugGrund(a, d, me) {
-    if (d.gewaehlt) return d.bezug === me ? "Für die eigene Arbeit. Bleibt bei Ihrer Station." : "Von Ihnen gewählt.";
-    if (me === 0) return "Die Station, bei der der Träger gerade ist.";
-    if (d.art === "frage" || d.art === "vorschlag") return "Fragen und Vorschläge gehen an den Auftraggeber.";
-    const b = a.bauteile.find(q => q.id === d.bauteil);
-    if (d.bezug === me) return "Für die eigene Arbeit. Bleibt bei Ihrer Station.";
-    if (b && b.verlauf.includes(d.bezug)) {
-      return d.bezug < me ? `${b.name} kam zuletzt aus Station ${d.bezug}.` : `${b.name} geht als Nächstes an Station ${d.bezug}.`;
-    }
-    return d.bezug < me ? "Die Station direkt vor Ihnen." : "Die Station direkt nach Ihnen.";
   }
 
   /* =====================================================================
@@ -1550,29 +1538,29 @@ img.view3d { object-fit: contain; padding: 28px; }
         <button class="kachel memo" type="button" data-memo="neu">${ICO.mikro}<span>${d.memo ? "Memo ✓" : "Sprachmemo"}</span><small class="uhr"></small></button></div>`;
     const memo = d.memo ? memoZeile(d.dauer, "neu") : "";
     const abschrift = d.memo ? `<label class="feld"><span class="beschr">Abschrift</span><textarea data-bind="neu.abschrift" rows="3">${esc(d.abschrift)}</textarea></label>` : "";
-    // Bezug
-    const knoten = [];
+    /* Bezug: die Kette mit dem Verfahren jeder Station, ohne Vorschlag */
+    const glieder = [];
     for (let nr = 0; nr < ende(a); nr++) {
-      const ok = erlaubt(a, d.art, nr, me);
-      const eigen = nr === me && me !== 0;
-      knoten.push(`<button class="bk${eigen ? " eigen" : ""}${d.bezug === nr ? " gewaehlt" : ""}" type="button" data-act="bezug" data-nr="${nr}" ${ok ? "" : "disabled"} aria-pressed="${d.bezug === nr}" aria-label="${esc(langName(a, nr))}${eigen ? ", eigene Station" : ""}">
-        <span>${knotenText(a, nr)}</span><small>${eigen ? "eigene" : "&nbsp;"}</small></button>`);
+      const ok = erlaubt(a, d.art, nr, me), eigen = nr === me && me !== 0, gew = d.bezug === nr;
+      const titel = nr === 0 ? "Auftraggeber" : werkVon(a, nr).verfahren;
+      const unter = nr === 0 ? AUFTRAGGEBER.name : `Station ${nr} · ${werkVon(a, nr).name}`;
+      glieder.push(`<button class="bglied${gew ? " gewaehlt" : ""}${eigen ? " eigen" : ""}" type="button" data-act="bezug" data-nr="${nr}" ${ok ? "" : "disabled"} aria-pressed="${gew}">
+        <span class="knoten">${knotenText(a, nr)}</span>
+        <span class="rest"><span class="ktitel">${esc(titel)}</span><span class="neben">${esc(unter)}</span></span>
+        ${eigen ? '<span class="pill st-arbeit">eigene</span>' : ""}${gew ? `<span class="haken">${ICO.haken}</span>` : ""}</button>`);
     }
-    const bezug = `<section class="bezug"><div class="oben"><p>${d.gewaehlt ? "Bezug" : "Bezug, vorgeschlagen"}</p>
-        <button class="textbtn" type="button" data-act="bezug-aendern" aria-expanded="${!!d.aendern}">${d.aendern ? "fertig" : "ändern"}</button></div>
-        <p class="gross">${esc(d.bezug === me && me !== 0 ? `Eigene Station · ${werkVon(a, me).verfahren}` : langName(a, d.bezug))}</p>
-        <p class="neben">${esc(bezugGrund(a, d, me))}</p>
-        ${d.aendern ? `<div class="knotenreihe">${knoten.join("")}</div>` : ""}</section>`;
-    const satz = d.bezug === me && me !== 0 ? "" : `<label class="feld"><span class="beschr">Was heißt das für ${d.bezug === 0 ? "den Auftraggeber" : `Station ${d.bezug}`}?</span>
+    const bezug = `<section class="karte"><h2 class="ktitel">Bezug</h2><div class="bkette">${glieder.join("")}</div></section>`;
+    const gewaehlt = d.bezug != null, eigenWahl = gewaehlt && d.bezug === me && me !== 0;
+    const satz = !gewaehlt || eigenWahl ? "" : `<label class="feld"><span class="beschr">Was heißt das für ${d.bezug === 0 ? "den Auftraggeber" : `Station ${d.bezug}`}?</span>
         <input data-bind="neu.satz" type="text" value="${esc(d.satz)}" autocomplete="off"></label>`;
-    let wer;
-    if (d.bezug === me && me !== 0) wer = "Bleibt bei Ihrer Station. Der Auftraggeber wird benachrichtigt.";
-    else if (me === 0) wer = `Station ${d.bezug} wird benachrichtigt.`;
-    else if (d.bezug === 0) wer = "Der Auftraggeber wird benachrichtigt.";
-    else wer = `Station ${d.bezug} und der Auftraggeber werden benachrichtigt.`;
+    let wer = "";
+    if (eigenWahl) wer = "Bleibt bei Ihrer Station. Der Auftraggeber wird benachrichtigt.";
+    else if (gewaehlt && me === 0) wer = `Station ${d.bezug} wird benachrichtigt.`;
+    else if (gewaehlt && d.bezug === 0) wer = "Der Auftraggeber wird benachrichtigt.";
+    else if (gewaehlt) wer = `Station ${d.bezug} und der Auftraggeber werden benachrichtigt.`;
     const body = kacheln + foto + memo + abschrift + bezug + satz
-      + `<p class="hinweiszeile">${wer}</p>`
-      + `<div class="fusszeile"><button class="btn pri block" type="button" data-act="senden" ${d.foto || d.memo ? "" : "disabled"}>Senden</button></div>`;
+      + (wer ? `<p class="hinweiszeile">${wer}</p>` : "")
+      + `<div class="fusszeile"><button class="btn pri block" type="button" data-act="senden" ${(d.foto || d.memo) && gewaehlt ? "" : "disabled"}>Senden</button></div>`;
     return { kopf, body };
   }
 
@@ -2491,7 +2479,8 @@ img.view3d { object-fit: contain; padding: 28px; }
     if (!km) return;
     const alt = ui.neu && ui.neu.bauteil === km.bauteil && ui.neu.stelle === km.stelle ? ui.neu : null;
     ui.neu = Object.assign(alt || { foto: null, striche: [], memo: false, dauer: 0, audio: null, abschrift: "", satz: "" },
-      { art, bauteil: km.bauteil, stelle: km.stelle, punkt: km.punkt || null, normal: km.normal || null, bezug: vorschlag(a, art, km.bauteil, me), gewaehlt: false, aendern: false });
+      { art, bauteil: km.bauteil, stelle: km.stelle, punkt: km.punkt || null, normal: km.normal || null,
+        bezug: alt && alt.bezug != null && erlaubt(a, art, alt.bezug, me) ? alt.bezug : null });
     ui.kreismenue = null; ui.blatt = "neu"; ui.blattHoehe = "voll";
     render();
   }
@@ -2810,10 +2799,9 @@ img.view3d { object-fit: contain; padding: 28px; }
       case "kreis-zu": ui.kreismenue = null; render(); break;
       case "kreis-art": waehleArt(el.dataset.art); break;
       case "zur-art": ui.kreismenue = { bauteil: ui.neu.bauteil, stelle: ui.neu.stelle, punkt: ui.neu.punkt, normal: ui.neu.normal, ziehen: false }; ui.blatt = "zu"; render(); break;
-      case "bezug-aendern": ui.neu.aendern = !ui.neu.aendern; render(); break;
-      case "bezug": ui.neu.bezug = +el.dataset.nr; ui.neu.gewaehlt = true; render(); break;
+      case "bezug": ui.neu.bezug = +el.dataset.nr; render(); break;
       case "foto": $("#fotoInput").click(); break;
-      case "senden": senden(); break;
+      case "senden": if (ui.neu && ui.neu.bezug != null) senden(); break;
       case "gesehen": { const x = findAnm(a, ui.offeneAnmerkung); if (x) alsGelesen(a, x); schliesseBlatt(); break; }
       case "antworten": ui.antwort = { text: "", memo: false, dauer: 0, audio: null }; ui.blatt = "antwort"; ui.blattHoehe = "voll"; render(); break;
       case "zur-anmerkung": ui.antwort = null; ui.blatt = "anmerkung"; render(); break;
@@ -3319,7 +3307,7 @@ img.view3d { object-fit: contain; padding: 28px; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261121112034";
+  const BUILD = "20261121113626";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
