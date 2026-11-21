@@ -1124,7 +1124,8 @@ img.view3d { object-fit: contain; padding: 28px; }
   }
 
   /* Wer darf was */
-  const darfAnmerken = a => state.ich !== "LOG" && meinNr(a) != null && !a.abgeschlossen && ansicht(a) >= jetzt(a);
+  /* Anmerkungen nur auf der Ebene „Bauteil“, nicht auf dem Träger mit allen Bauteilen */
+  const darfAnmerken = a => state.ich !== "LOG" && meinNr(a) != null && !a.abgeschlossen && ansicht(a) >= jetzt(a) && ui.ebene === "bauteil";
   const darfUebergeben = a => {
     const me = meinNr(a);
     return istWerk() && me != null && me === jetzt(a) && st(a, me).status === "in-arbeit" && ansicht(a) === jetzt(a);
@@ -1328,7 +1329,8 @@ img.view3d { object-fit: contain; padding: 28px; }
         ${zeitleiste(a)}
         <button class="btn umriss block" type="button" data-act="jetzt" style="margin-top:6px">Zurück zu jetzt</button>`;
     } else {
-      unten = zeitleiste(a);
+      unten = zeitleiste(a)
+        + (darfUebergeben(a) && ui.blatt === "zu" ? `<button class="btn pri block" type="button" data-act="fertigstellen" style="margin-top:10px">Fertigstellen</button>` : "");
     }
     return kopf + twin + unten + `<div class="platz${ui.blatt !== "zu" ? " gross" : ""}"></div>`;
   }
@@ -1600,7 +1602,7 @@ img.view3d { object-fit: contain; padding: 28px; }
 
   function blattUebergabe(a) {
     const me = meinNr(a), w = werkVon(a, me), nach = me + 1, E = ende(a);
-    const kopf = `<div class="blatt-kopf"><p class="neben">${a.id} · Station ${me} · ${esc(w.name)}</p><h2 class="btitel">Übergeben</h2></div>`;
+    const kopf = `<div class="blatt-kopf"><p class="neben">${a.id} · Station ${me} · ${esc(w.name)}</p><h2 class="btitel">Fertigstellen</h2></div>`;
     const eigeneOffen = a.anmerkungen.some(x => x.von === me && x.art === "frage" && x.offen);
     const eigene = a.anmerkungen.filter(x => x.von === me && !(x.art === "frage" && x.offen));
     const offen = offeneFragen(a).length;
@@ -1612,7 +1614,7 @@ img.view3d { object-fit: contain; padding: 28px; }
     const body = (eigeneOffen ? `<p class="hinweiszeile frage">Ihre Frage ist noch offen.</p>` : "")
       + `<p class="beschr" style="margin:0 0 8px">Was mitreist</p>${zeilen || '<p class="leer" style="margin-bottom:8px">Keine eigenen Anmerkungen.</p>'}`
       + `<div style="height:6px"></div>` + naechste
-      + `<div class="fusszeile"><button class="btn pri block" type="button" data-act="uebergeben">Übergabe bestätigen</button></div>`;
+      + `<div class="fusszeile"><button class="btn pri block" type="button" data-act="uebergeben">Fertigstellen bestätigen</button></div>`;
     return { kopf, body };
   }
 
@@ -2807,6 +2809,7 @@ img.view3d { object-fit: contain; padding: 28px; }
       case "zur-anmerkung": ui.antwort = null; ui.blatt = "anmerkung"; render(); break;
       case "antwort-senden": antwortSenden(); break;
       case "uebergeben": uebergeben(); break;
+      case "fertigstellen": if (darfUebergeben(a)) oeffneUebergabe(); break;
       case "abspielen": abspielen(el.dataset.q); break;
       case "uebernehmen": {
         a.stationen.forEach(s => { s.uebernommen = a.anmerkungen.filter(x => x.bezug === s.nr).map(x => x.id); });
@@ -3067,6 +3070,8 @@ img.view3d { object-fit: contain; padding: 28px; }
   function starteLangdruck(e, flaeche, aufPin) {
     const a = cur();
     g = { typ: "lp", id: e.pointerId, x0: e.clientX, y0: e.clientY, flaeche, aufPin };
+    /* Auf dem Träger nur Tippen (öffnet das Bauteil), kein langer Druck */
+    if (flaeche.dataset.twin === "traeger") return;
     zeigeRing(e.clientX, e.clientY);
     g.timer = setTimeout(() => {
       if (!g || g.typ !== "lp") return;
@@ -3307,7 +3312,7 @@ img.view3d { object-fit: contain; padding: 28px; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261121113626";
+  const BUILD = "20261121114932";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
