@@ -475,6 +475,17 @@ img.view3d { object-fit: contain; padding: 28px; }
 .bglied.gewaehlt .knoten { background: var(--pri); color: var(--card); box-shadow: none; border: 0; }
 .bglied .haken { color: var(--pri); display: grid; }
 .bglied:disabled { opacity: .4; cursor: default; }
+
+/* ---------- Unterlagen öffnen ---------- */
+.dokzeile-a .dokic { width: 36px; height: 36px; border-radius: 10px; background: var(--pri-soft); color: var(--pri); display: grid; place-items: center; flex: 0 0 auto; }
+.dok-titel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dok-bild { display: block; width: 100%; border-radius: 16px; background: var(--well); margin-bottom: 12px; }
+.dok-pdf { display: block; width: 100%; height: 62vh; border: 0; border-radius: 16px; background: var(--well); margin-bottom: 12px; }
+.dok-text { white-space: pre-wrap; word-break: break-word; font: 600 13px/19px var(--font); background: var(--well); border-radius: 16px; padding: 12px 14px; margin: 0; max-height: 66vh; overflow: auto; }
+.dok-andere { display: grid; justify-items: center; gap: 8px; padding: 28px 0 18px; text-align: center; }
+.dokic.gross { width: 64px; height: 64px; border-radius: 16px; background: var(--pri-soft); color: var(--pri); display: grid; place-items: center; }
+.dokic.gross svg { width: 32px; height: 32px; }
+a.btn { text-decoration: none; }
 </style>
 </head>
 <body>
@@ -1001,6 +1012,7 @@ img.view3d { object-fit: contain; padding: 28px; }
     glocke: `<svg width="20" height="20" viewBox="0 0 20 20" ${STROKE}><path d="M5 14V9a5 5 0 0 1 10 0v5l1.5 2h-13zM8 18h4"/></svg>`,
     code: `<svg width="56" height="56" viewBox="0 0 56 56" ${STROKE}><rect x="6" y="6" width="16" height="16" rx="2"/><rect x="34" y="6" width="16" height="16" rx="2"/><rect x="6" y="34" width="16" height="16" rx="2"/><path d="M34 34h6v6M50 34v4M44 50h6v-6M34 46v4"/></svg>`,
     scan: `<svg width="22" height="22" viewBox="0 0 22 22" ${STROKE}><path d="M2 7V4a2 2 0 0 1 2-2h3M15 2h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M7 20H4a2 2 0 0 1-2-2v-3M6 11h10"/></svg>`,
+    dok: `<svg width="22" height="22" viewBox="0 0 22 22" ${STROKE}><path d="M5 2h8l4 4v14H5zM13 2v4h4M8 11h6M8 15h6"/></svg>`,
     haken: `<svg width="18" height="18" viewBox="0 0 18 18" ${STROKE}><path d="m4 9.5 3.2 3L14 6"/></svg>`,
     menue: `<svg width="18" height="18" viewBox="0 0 18 18" ${STROKE}><path d="M3 5h12M3 9h12M3 13h12"/></svg>`,
     abspielen: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 2.5v9l7.5-4.5z" style="fill:var(--card)"/></svg>'
@@ -1050,7 +1062,7 @@ img.view3d { object-fit: contain; padding: 28px; }
   let state = laden();
   const ui = {
     ebene: "alle", bauteil: null, ansicht: null, blatt: "zu", blattHoehe: "peek", kreismenue: null, modus: null,
-    offeneAnmerkung: null, unterlagenVon: null, auftragAuf: false, neu: null, antwort: null, projekt: null, landet: null, logAuftrag: null
+    offeneAnmerkung: null, unterlagenVon: null, dokument: null, dokVon: null, auftragAuf: false, neu: null, antwort: null, projekt: null, landet: null, logAuftrag: null
   };
 
   /* =====================================================================
@@ -1391,14 +1403,14 @@ img.view3d { object-fit: contain; padding: 28px; }
         ${nr === j ? '<span class="tl-jetzt" style="position:static;transform:none">jetzt</span>' : ""}
         <span class="chips">${chips}</span></button>`;
     }).join("");
-    const tags = a.unterlagen.map(u => `<span class="tag">${esc(u.name)} · Index ${esc(u.index)}</span>`).join("");
+    const doks = a.unterlagen.filter(u => !u.modell || u.modell === b.modell || !a.bauteile.some(q => q.modell === u.modell));
     return `<div class="head"><div class="kopf-l"><button class="textbtn" type="button" data-act="ebene" data-ebene="traeger" style="min-height:32px">‹ Träger ${a.id}</button>
         <h1 class="titel">${esc(b.name)}</h1></div></div>
       ${b.form === "modell"
         ? `<div class="bwell b3d" id="slot3d" data-twin="bauteil3d" data-bt="${b.id}" role="group" aria-label="3D-Modell ${esc(b.name)}">${pins3d}</div>`
         : `<div class="bwell"><div class="bpart${b.form === "rund" ? " rund" : ""}" id="bpart" data-twin="bauteil" style="aspect-ratio:${verhaeltnis};${groesse}">${pins}</div></div>`}
       <section class="karte"><h2 class="ktitel">Verlauf dieses Bauteils</h2><div class="verlauf">${zeilen}</div></section>
-      <section class="karte"><h2 class="ktitel">Unterlagen</h2><div class="tags">${tags || '<span class="leer">Keine Unterlagen</span>'}</div></section>
+      <section class="karte"><h2 class="ktitel">Unterlagen</h2>${dokZeilen(doks) || '<p class="leer">Keine Unterlagen</p>'}</section>
       <div class="platz"></div>`;
   }
 
@@ -1499,8 +1511,7 @@ img.view3d { object-fit: contain; padding: 28px; }
         <div class="zeile"><span class="rest"><span class="neben">Hinweise</span><span class="text">${esc(a.auftrag.hinweise || "Keine")}</span></span></div>` : ""}</section>`;
     // Unterlagen
     const docs = a.unterlagen.filter(u => u.station == null || u.station === nr);
-    const tags = docs.map(u => `<span class="tag">${esc(u.name)} · Index ${esc(u.index)}</span>`).join("");
-    const unterlagen = `<section class="karte"><h2 class="ktitel">Unterlagen</h2><div class="tags">${tags || '<span class="leer">Keine Unterlagen für diese Station</span>'}</div></section>`;
+    const unterlagen = `<section class="karte"><h2 class="ktitel">Unterlagen</h2>${dokZeilen(docs) || '<p class="leer">Keine Unterlagen für diese Station</p>'}</section>`;
     // Offene Fragen
     const fragen = offeneFragen(a).map(x => {
       const eigene = rolleVon(a, x.von) === state.ich;
@@ -1564,6 +1575,66 @@ img.view3d { object-fit: contain; padding: 28px; }
       + (wer ? `<p class="hinweiszeile">${wer}</p>` : "")
       + `<div class="fusszeile"><button class="btn pri block" type="button" data-act="senden" ${(d.foto || d.memo) && gewaehlt ? "" : "disabled"}>Senden</button></div>`;
     return { kopf, body };
+  }
+
+  /* Unterlagen öffnen: Dateien des Auftraggebers liegen im Speicher des Browsers */
+  const DATEIEN = new Map();
+  const dokZeilen = docs => docs.map(u => `<button class="zeile dokzeile-a" type="button" data-act="dok" data-id="${u.id}">
+      <span class="dokic">${ICO.dok}</span><span class="rest"><span class="text">${esc(u.name)}</span><span class="neben">${esc(u.art)} · Index ${esc(u.index)}</span></span><span class="neben" aria-hidden="true">›</span></button>`).join("");
+  function dateiSpeichern(key, datei) {
+    DATEIEN.set(key, { blob: datei, url: null, text: null });
+    datei.arrayBuffer().then(buf => IDB.dateiLegen(key, { buf, typ: datei.type, name: datei.name })).catch(() => { /* ohne Speicher */ });
+  }
+  async function dateiLaden(key) {
+    if (DATEIEN.has(key)) return DATEIEN.get(key);
+    const w = await IDB.dateiHolen(key);
+    if (!w) { DATEIEN.set(key, null); return null; }
+    const e = { blob: new Blob([w.buf], { type: w.typ || "" }), url: null, text: null };
+    DATEIEN.set(key, e);
+    return e;
+  }
+  function dokArt(u) {
+    const n = u.name.toLowerCase(), t = (u.typ || "").toLowerCase();
+    if (/^image\/(png|jpe?g|gif|webp|svg\+xml|bmp|heic|heif)$/.test(t) || /\.(png|jpe?g|gif|webp|svg|bmp|heic|heif)$/.test(n)) return "bild";
+    if (t === "application/pdf" || /\.pdf$/.test(n)) return "pdf";
+    if (t.indexOf("text/") === 0 || /\.(txt|csv|md|json|xml)$/.test(n)) return "text";
+    return "andere";
+  }
+  const groesse = b => (b >= 1048576 ? (b / 1048576).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB");
+  function oeffneDokument(id) {
+    const a = cur(), u = a.unterlagen.find(x => x.id === id);
+    if (!u) return;
+    /* 3D-Modell eines Bauteils: gleich die drehbare Ansicht */
+    const b = u.modell && a.bauteile.find(q => q.modell === u.modell);
+    if (b) { ui.ebene = "traeger"; oeffneBauteil(b.id); return; }
+    ui.dokVon = ui.blatt === "unterlagen" ? "unterlagen" : null;
+    ui.dokument = id; ui.blatt = "dokument"; ui.blattHoehe = "voll";
+    render();
+  }
+  function blattDokument(a) {
+    const u = a.unterlagen.find(x => x.id === ui.dokument);
+    if (!u) return { kopf: "", body: "" };
+    const kopf = `<div class="blatt-kopf"><div class="kopfzeile"><button class="rundknopf" type="button" data-act="dok-zurueck" aria-label="Zurück">${ICO.zurueck}</button>
+        <span class="btitel dok-titel">${esc(u.name)}</span></div>
+      <p class="neben">${esc(u.art)} · Index ${esc(u.index)}${u.groesse ? " · " + groesse(u.groesse) : ""}</p></div>`;
+    if (!u.ablage) return { kopf, body: `<p class="hinweiszeile">Die Datei liegt nicht auf diesem Gerät.</p>` };
+    const d = DATEIEN.get(u.ablage);
+    if (d === undefined) {
+      dateiLaden(u.ablage).then(() => { if (ui.blatt === "dokument" && ui.dokument === u.id) render(); });
+      return { kopf, body: `<p class="neben">wird geladen …</p>` };
+    }
+    if (d === null) return { kopf, body: `<p class="hinweiszeile">Die Datei liegt nicht auf diesem Gerät.</p>` };
+    if (!d.url) d.url = URL.createObjectURL(d.blob);
+    const oeffnen = `<a class="btn umriss block" href="${d.url}" target="_blank" rel="noopener" download="${esc(u.name)}">Öffnen</a>`;
+    const art = dokArt(u);
+    let body;
+    if (art === "bild") body = `<img class="dok-bild" src="${d.url}" alt="${esc(u.name)}">`;
+    else if (art === "pdf") body = `<iframe class="dok-pdf" src="${d.url}" title="${esc(u.name)}"></iframe><a class="btn umriss block" href="${d.url}" target="_blank" rel="noopener">In Safari öffnen</a>`;
+    else if (art === "text") {
+      if (d.text == null) { d.blob.text().then(t => { d.text = t.slice(0, 200000); if (ui.blatt === "dokument") render(); }); body = `<p class="neben">wird geladen …</p>`; }
+      else body = `<pre class="dok-text">${esc(d.text)}</pre>`;
+    } else body = `<div class="dok-andere"><span class="dokic gross">${ICO.dok}</span><p class="text">${esc(u.name)}</p></div>${oeffnen}`;
+    return { kopf, body: body + `<div style="height:16px"></div>` };
   }
 
   function blattAnmerkung(a) {
@@ -1711,8 +1782,12 @@ img.view3d { object-fit: contain; padding: 28px; }
       if (IDB.db) return Promise.resolve(IDB.db);
       return new Promise(res => {
         try {
-          const r = indexedDB.open("traeger-entwurf-2", 1);
-          r.onupgradeneeded = () => r.result.createObjectStore("modelle");
+          const r = indexedDB.open("traeger-entwurf-2", 2);
+          r.onupgradeneeded = () => {
+            const db = r.result;
+            if (!db.objectStoreNames.contains("modelle")) db.createObjectStore("modelle");
+            if (!db.objectStoreNames.contains("dateien")) db.createObjectStore("dateien");
+          };
           r.onsuccess = () => { IDB.db = r.result; res(IDB.db); };
           r.onerror = () => res(null);
         } catch (e) { res(null); }
@@ -1734,6 +1809,19 @@ img.view3d { object-fit: contain; padding: 28px; }
       const db = await IDB.oeffnen();
       if (!db) return;
       try { db.transaction("modelle", "readwrite").objectStore("modelle").clear(); } catch (e) { /* leer */ }
+      try { db.transaction("dateien", "readwrite").objectStore("dateien").clear(); } catch (e) { /* leer */ }
+    },
+    async dateiLegen(key, wert) {
+      const db = await IDB.oeffnen();
+      if (!db) return;
+      try { db.transaction("dateien", "readwrite").objectStore("dateien").put(wert, key); } catch (e) { /* ohne Speicher */ }
+    },
+    async dateiHolen(key) {
+      const db = await IDB.oeffnen();
+      if (!db) return null;
+      return new Promise(res => {
+        try { const r = db.transaction("dateien").objectStore("dateien").get(key); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null); } catch (e) { res(null); }
+      });
     }
   };
   async function modellHolen(id) {
@@ -2130,6 +2218,7 @@ img.view3d { object-fit: contain; padding: 28px; }
       case "antwort": teil = blattAntwort(a); break;
       case "uebergabe": teil = blattUebergabe(a); break;
       case "projekt": teil = blattProjekt(); break;
+      case "dokument": teil = blattDokument(a); break;
       default: teil = null;
     }
     sh.innerHTML = teil
@@ -2632,7 +2721,7 @@ img.view3d { object-fit: contain; padding: 28px; }
       try {
         const x = await leseModellDatei(f);
         Object.assign(platz, x, { laedt: false });
-        p.unterlagen.push({ name: f.name, art: "3D-Modell", index: "A", station: "", modell: x.id });
+        p.unterlagen.push({ name: f.name, art: "3D-Modell", index: "A", station: "", modell: x.id, datei: f });
       } catch (err) {
         p.modelle.splice(p.modelle.indexOf(platz), 1);
         toast(err && err.message ? err.message : `${f.name}: Die Datei ließ sich nicht lesen.`);
@@ -2650,7 +2739,12 @@ img.view3d { object-fit: contain; padding: 28px; }
     const a = {
       id, traeger: p.traeger, titel: p.titel.trim(),
       auftrag: { stueckzahl: Math.max(1, parseInt(p.stueckzahl, 10) || 1), termin: p.termin, hinweise: p.hinweise.trim() },
-      unterlagen: p.unterlagen.map((u, i) => ({ id: "D" + (i + 1), art: u.art, name: u.name, index: u.index || "A", station: u.station ? nrVonKey[u.station] : null })),
+      unterlagen: p.unterlagen.map((u, i) => {
+        const ablage = u.datei ? "F" + Date.now().toString(36) + i : null;
+        if (ablage) dateiSpeichern(ablage, u.datei);
+        return { id: "D" + (i + 1), art: u.art, name: u.name, index: u.index || "A", station: u.station ? nrVonKey[u.station] : null,
+          modell: u.modell || null, ablage, typ: u.datei ? u.datei.type : "", groesse: u.datei ? u.datei.size : 0 };
+      }),
       stationen, bauteile: bauteileAus(p, stationen), anmerkungen: [],
       logistik: { von: 0, nach: 1, status: "angefragt", zeit: jetztIso() }, zurueck: false, abgeschlossen: false
     };
@@ -2796,6 +2890,11 @@ img.view3d { object-fit: contain; padding: 28px; }
       }
       case "unterlagen-von": oeffneUnterlagen(+el.dataset.nr); break;
       case "blatt-zu": schliesseBlatt(); break;
+      case "dok": oeffneDokument(el.dataset.id); break;
+      case "dok-zurueck":
+        if (ui.dokVon === "unterlagen") { ui.blatt = "unterlagen"; ui.blattHoehe = "voll"; ui.dokument = null; render(); }
+        else schliesseBlatt();
+        break;
       case "auftrag-auf": ui.auftragAuf = !ui.auftragAuf; render(); break;
       case "plus": ui.modus = "stelle-waehlen"; render(); break;
       case "kreis-zu": ui.kreismenue = null; render(); break;
@@ -2923,7 +3022,7 @@ img.view3d { object-fit: contain; padding: 28px; }
     if (t.id === "dateiInput" && t.files && ui.projekt) {
       Array.from(t.files).forEach(f => {
         const art = /\.(step|stp|igs|iges|stl)$/i.test(f.name) ? "3D-Modell" : /pr[üu]f/i.test(f.name) ? "Prüfplan" : /\.(pdf|dxf|dwg|png|jpe?g)$/i.test(f.name) ? "Zeichnung" : "Sonstiges";
-        ui.projekt.unterlagen.push({ name: f.name, art, index: "A", station: "" });
+        ui.projekt.unterlagen.push({ name: f.name, art, index: "A", station: "", datei: f });
       });
       t.value = ""; render();
     }
@@ -3312,7 +3411,7 @@ img.view3d { object-fit: contain; padding: 28px; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261121114932";
+  const BUILD = "20261121115602";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
