@@ -426,6 +426,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .kachel.rec { animation: none; }
 }
 .geste.unter-well { margin: -4px 0 12px; }
+.dbtn:disabled { opacity: .4; cursor: default; }
+.tcard.neu { align-content: center; }
 </style>
 </head>
 <body>
@@ -457,7 +459,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
      Konstanten
      ===================================================================== */
   const KEY = "traeger-entwurf-2";
-  const VERSION = 1;
+  const VERSION = 2;
 
   const ARTEN = {
     frage:     { name: "Frage",     z: "?", kurz: "Station kann nicht weiter" },
@@ -480,18 +482,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   };
   const AUFTRAGGEBER = { name: "Produktentwicklung", adresse: "Entwicklungsweg 1, 10001 Beispielstadt" };
   const LOGISTIK = { name: "Kurier Mitte" };
-  const ROLLEN = [
-    { id: "W1", label: "Station 1", sub: WERK.W1.name },
-    { id: "W2", label: "Station 2", sub: WERK.W2.name },
-    { id: "W3", label: "Station 3", sub: WERK.W3.name },
-    { id: "W4", label: "Station 4", sub: WERK.W4.name },
-    { id: "AG", label: "Auftraggeber", sub: AUFTRAGGEBER.name },
-    { id: "LOG", label: "Logistik", sub: LOGISTIK.name }
-  ];
+  const ROLLEN = [{ id: "AG", label: "Auftraggeber", sub: AUFTRAGGEBER.name }]
+    .concat(Object.keys(WERK).map(id => ({ id, label: WERK[id].name, sub: WERK[id].verfahren })))
+    .concat([{ id: "LOG", label: "Logistik", sub: LOGISTIK.name }]);
   /* Änderung 3: drei Zustände je Station, dazu „geplant“ für Stationen, die noch nicht dran sind */
   const STATUS_NAME = { geplant: "Geplant", lieferung: "Lieferung", "in-arbeit": "In Arbeit", abgeschlossen: "Abgeschlossen" };
   const STATUS_KLASSE = { geplant: "st-geplant", lieferung: "st-lieferung", "in-arbeit": "st-arbeit", abgeschlossen: "st-fertig" };
-  const BEISPIEL_ABSCHRIFT = "An der markierten Stelle ist etwas anders als in der Zeichnung. Bitte vor dem nächsten Arbeitsgang prüfen.";
   const STROKE = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
   const ICO = {
     zurueck: `<svg width="20" height="20" viewBox="0 0 20 20" ${STROKE}><path d="M12.5 4.5 7 10l5.5 5.5"/></svg>`,
@@ -507,12 +503,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   };
 
   /* =====================================================================
-     Beispieldaten
+     Startzustand: noch kein Auftrag, nur die Werkstätten im Netzwerk
      ===================================================================== */
   const T = (tag, zeit) => `2026-11-${tag}T${zeit}`;
   function anm(o) {
     return Object.assign({ foto: null, dauer: 0, abschrift: "", heisstFuer: "", bauteil: null, stelle: { x: .5, y: .5 },
-      gelesenVon: [], antworten: [], offen: false, beispiel: false }, o);
+      gelesenVon: [], antworten: [], offen: false }, o);
   }
   function layout(zahl, stationen) {
     const alle = stationen.map((_, i) => i + 1);
@@ -525,77 +521,9 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     return vorlagen[zahl].map((b, i) => Object.assign({ id: "B" + (i + 1), name: "Bauteil " + (i + 1), verlauf: alle.slice() }, b));
   }
   function seed() {
-    const a1 = {
-      id: "A-0412", traeger: "PC-0007", titel: "Baugruppe, Muster 2",
-      auftrag: { stueckzahl: 1, termin: "2026-11-24", hinweise: "Kanten nicht nacharbeiten. Bei Unklarheiten eine Frage stellen." },
-      unterlagen: [{ id: "D1", art: "Zeichnung", name: "Zeichnung", index: "B", station: null }, { id: "D2", art: "3D-Modell", name: "3D-Modell", index: "B", station: null }],
-      stationen: [
-        { nr: 1, werkstatt: "W1", status: "abgeschlossen", empfang: T(17, "08:05"), fertig: T(17, "16:30") },
-        { nr: 2, werkstatt: "W2", status: "abgeschlossen", empfang: T(18, "09:20"), fertig: T(19, "15:55") },
-        { nr: 3, werkstatt: "W3", status: "in-arbeit", empfang: T(20, "09:12") },
-        { nr: 4, werkstatt: "W4", status: "geplant" }
-      ],
-      bauteile: [
-        { id: "B1", name: "Bauteil 1", x: 8, y: 14, w: 38, h: 30, form: "rechteck", verlauf: [1, 2, 3] },
-        { id: "B2", name: "Bauteil 2", x: 56, y: 10, w: 34, h: 46, form: "rund", verlauf: [1, 2, 3, 4] },
-        { id: "B3", name: "Bauteil 3", x: 10, y: 58, w: 28, h: 28, form: "rechteck", verlauf: [1, 3] }
-      ],
-      anmerkungen: [
-        anm({ id: "N1", art: "bedeutung", von: 2, bezug: 3, bauteil: "B2", stelle: { x: .85, y: .15 }, dauer: 14, foto: "beispiel",
-          abschrift: "Die Kante an Bauteil 2 ist nach dem Fügen leicht aufgeworfen. Vor dem Beschichten bitte prüfen.",
-          heisstFuer: "Kante vor dem Beschichten glätten.", zeit: T(19, "15:40") }),
-        anm({ id: "N2", art: "anpassung", von: 2, bezug: 1, bauteil: "B1", stelle: { x: .9, y: .1 }, dauer: 8,
-          abschrift: "Die Fügestelle wurde versetzt, weil der Schnitt an der Ecke knapp war.", zeit: T(19, "11:05"), gelesenVon: ["W1", "W3", "AG"] }),
-        anm({ id: "N3", art: "gebraucht", von: 3, bezug: 2, bauteil: "B3", stelle: { x: .85, y: .1 }, dauer: 11,
-          abschrift: "Für die Abdeckung fehlte die Angabe, welche Fläche frei bleiben soll.", zeit: T(20, "10:30"), gelesenVon: ["AG"] }),
-        anm({ id: "N4", art: "bedeutung", von: 3, bezug: 4, bauteil: "B1", stelle: { x: .2, y: .8 }, dauer: 9,
-          abschrift: "Die Beschichtung an der Unterseite braucht noch einen Tag zum Aushärten.", heisstFuer: "Unterseite nicht vor morgen belasten.",
-          zeit: T(20, "14:15"), gelesenVon: ["AG"] }),
-        anm({ id: "N5", art: "frage", von: 1, bezug: 0, bauteil: null, stelle: { x: .97, y: .5 }, dauer: 12,
-          abschrift: "Ist die Schnittkante als Sichtfläche gedacht?", zeit: T(17, "14:00"), offen: true, gelesenVon: ["AG"] }),
-        anm({ id: "N6", art: "frage", von: 3, bezug: 0, bauteil: "B2", stelle: { x: .2, y: .85 }, dauer: 10,
-          abschrift: "Darf die Schichtdicke am Rand etwas dünner ausfallen?", zeit: T(20, "11:20"), offen: false, gelesenVon: ["AG"],
-          antworten: [{ von: 0, dauer: 9, abschrift: "Ja, am Rand ist das zulässig. Die Mitte bitte wie gezeichnet.", zeit: T(20, "16:05"), gelesenVon: [] }] })
-      ],
-      logistik: null, zurueck: false, abgeschlossen: false
-    };
-    const st2 = [
-      { nr: 1, werkstatt: "W7", status: "abgeschlossen", empfang: T(16, "08:00"), fertig: T(18, "12:00") },
-      { nr: 2, werkstatt: "W1", status: "in-arbeit", empfang: T(19, "10:40") },
-      { nr: 3, werkstatt: "W6", status: "geplant" }, { nr: 4, werkstatt: "W3", status: "geplant" }, { nr: 5, werkstatt: "W4", status: "geplant" }
-    ];
-    const a2 = {
-      id: "A-0398", traeger: "PC-0003", titel: "Halter, Vorserie", auftrag: { stueckzahl: 4, termin: "2026-12-02", hinweise: "Fixierung im Träger nicht umbauen." },
-      unterlagen: [{ id: "D1", art: "Zeichnung", name: "Zeichnung", index: "A", station: null }, { id: "D2", art: "3D-Modell", name: "3D-Modell", index: "A", station: null }],
-      stationen: st2, bauteile: layout(2, st2),
-      anmerkungen: [anm({ id: "M1", art: "frage", von: 2, bezug: 0, bauteil: "B1", stelle: { x: .5, y: .3 }, dauer: 7,
-        abschrift: "Soll die Bohrung vor oder nach dem Härten entstehen?", zeit: T(20, "13:10"), offen: true })],
-      logistik: null, zurueck: false, abgeschlossen: false
-    };
-    const st3 = [{ nr: 1, werkstatt: "W5", status: "lieferung" }, { nr: 2, werkstatt: "W3", status: "geplant" }, { nr: 3, werkstatt: "W2", status: "geplant" }];
-    const a3 = {
-      id: "A-0421", traeger: "PC-0011", titel: "Deckel, Muster 1", auftrag: { stueckzahl: 2, termin: "2026-12-09", hinweise: "" },
-      unterlagen: [{ id: "D1", art: "Zeichnung", name: "Zeichnung", index: "A", station: null }],
-      stationen: st3, bauteile: layout(1, st3), anmerkungen: [],
-      logistik: { von: 0, nach: 1, status: "abgeholt", zeit: T(20, "15:00"), abgeholt: T(20, "17:00"), ankunft: "kommt Do" },
-      zurueck: false, abgeschlossen: false
-    };
-    const st4 = [
-      { nr: 1, werkstatt: "W1", status: "abgeschlossen", empfang: T(3, "09:00"), fertig: T(4, "15:00") },
-      { nr: 2, werkstatt: "W3", status: "abgeschlossen", empfang: T(5, "08:30"), fertig: T(6, "14:00") },
-      { nr: 3, werkstatt: "W4", status: "abgeschlossen", empfang: T(7, "09:10"), fertig: T(9, "11:00") }
-    ];
-    const a4 = {
-      id: "A-0377", traeger: "PC-0002", titel: "Gehäuse, Muster 4", auftrag: { stueckzahl: 1, termin: "2026-11-12", hinweise: "" },
-      unterlagen: [{ id: "D1", art: "Zeichnung", name: "Zeichnung", index: "C", station: null }],
-      stationen: st4, bauteile: layout(2, st4),
-      anmerkungen: [anm({ id: "K1", art: "vorschlag", von: 2, bezug: 0, bauteil: "B2", stelle: { x: .7, y: .3 }, dauer: 6,
-        abschrift: "In der Serie ließe sich die Abdeckung mit einer Schablone schneller aufbringen.", zeit: T(6, "13:40"), gelesenVon: ["AG", "W1", "W3", "W4"] })],
-      logistik: null, zurueck: true, abgeschlossen: true
-    };
     return {
-      version: VERSION, ich: "W3", aktuellerAuftrag: "A-0412", auftraege: [a1, a2, a3, a4],
-      posteingang: [], warteschlange: [], hinweiseGesehen: {}, freieTraeger: ["PC-0013", "PC-0014", "PC-0015", "PC-0016"]
+      version: VERSION, ich: "AG", aktuellerAuftrag: null, auftraege: [],
+      posteingang: [], warteschlange: [], freieTraeger: ["PC-0007", "PC-0008", "PC-0009", "PC-0010", "PC-0011"]
     };
   }
 
@@ -610,14 +538,14 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     try {
       localStorage.setItem(KEY, JSON.stringify(state, (k, v) => {
         if (k === "audio") return undefined;
-        if (k === "foto" && v && v !== "beispiel") return null;
+        if (k === "foto" && v) return null;
         return v;
       }));
     } catch (e) { /* ohne Speicher weiter */ }
   }
   let state = laden();
   const ui = {
-    ebene: "traeger", bauteil: null, ansicht: null, blatt: "zu", blattHoehe: "peek", kreismenue: null, modus: null,
+    ebene: "alle", bauteil: null, ansicht: null, blatt: "zu", blattHoehe: "peek", kreismenue: null, modus: null,
     offeneAnmerkung: null, unterlagenVon: null, auftragAuf: false, neu: null, antwort: null, projekt: null, landet: null, logAuftrag: null
   };
 
@@ -739,8 +667,6 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
      ===================================================================== */
   const chip = (art, g = "m") => `<span class="chip ${g} a-${art}" aria-hidden="true"><b>${ARTEN[art].z}</b></span>`;
   const statusPill = s => `<span class="pill ${STATUS_KLASSE[s]}">${STATUS_NAME[s]}</span>`;
-  const hinweis = (key, text) => ((state.hinweiseGesehen[key] || 0) >= 3 ? "" : `<p class="neben geste">${text}</p>`);
-  function zaehleHinweis(key) { state.hinweiseGesehen[key] = (state.hinweiseGesehen[key] || 0) + 1; speichern(); }
   function welle(n = 26, seed = 3) {
     let h = "";
     for (let i = 0; i < n; i++) h += `<i style="height:${6 + ((i * 37 + seed * 11) % 20)}px"></i>`;
@@ -813,7 +739,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const e = ui.ebene;
     return `<div class="seg" role="group" aria-label="Maßstab">
       <button type="button" data-act="ebene" data-ebene="alle" aria-pressed="${e === "alle"}">Alle</button>
-      <button type="button" data-act="ebene" data-ebene="traeger" aria-pressed="${e === "traeger"}">Träger</button>
+      <button type="button" data-act="ebene" data-ebene="traeger" aria-pressed="${e === "traeger"}" ${cur() ? "" : "disabled"}>Träger</button>
       <button type="button" data-act="ebene" data-ebene="bauteil" aria-pressed="${e === "bauteil"}" ${ui.bauteil ? "" : "disabled"}>Bauteil</button></div>`;
   }
 
@@ -834,12 +760,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         <span>${pillAuftrag(a)}</span></button>`;
     }).join("");
     const neuKarte = state.ich === "AG"
-      ? `<button class="tcard neu" type="button" data-act="projekt-neu"><span class="plus"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16" style="stroke:var(--card)" stroke-width="3" stroke-linecap="round"/></svg></span><span class="ktitel">Neues Projekt</span><span class="neben" style="color:var(--pri)">Werkstätten, Unterlagen, Träger</span></button>`
+      ? `<button class="tcard neu" type="button" data-act="projekt-neu"><span class="plus"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16" style="stroke:var(--card)" stroke-width="3" stroke-linecap="round"/></svg></span><span class="ktitel">Neues Projekt</span></button>`
       : "";
     const wer = state.ich === "AG" ? AUFTRAGGEBER.name : WERK[state.ich].name;
     return `<div class="head"><div class="kopf-l"><p class="werk">${ICO.werk} ${esc(wer)}</p><h1 class="titel">Alle Träger</h1>
-      <p class="neben">${liste.length} laufende Aufträge im Netzwerk</p></div></div>
-      <div class="raster">${neuKarte}${karten}</div>${hinweis("aufziehen", "Auseinanderziehen öffnet den Träger")}<div class="platz"></div>`;
+      <p class="neben">${liste.length ? `${liste.length} Auftr${liste.length === 1 ? "ag" : "äge"} im Netzwerk` : "Keine Aufträge"}</p></div></div>
+      <div class="raster">${neuKarte}${karten}</div><div class="platz"></div>`;
   }
 
   /* Kopf auf „Träger, jetzt“. Änderung 7: Name der Werkstatt steht oben. */
@@ -873,7 +799,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     }
     if (s.status === "lieferung") {
       return `<div class="status lieferung"><span class="ico">${ICO.lkw(22)}</span><div><p class="t">Lieferung · Der Träger ist unterwegs zu Ihnen</p>
-        <p class="u">${L ? esc(logistikStand(L)) : "Noch nicht abgeholt"}. Beim Eintreffen den Code am Träger scannen.</p></div></div>`;
+        <p class="u">${L ? esc(logistikStand(L)) : "Noch nicht abgeholt"}</p></div></div>`;
     }
     return "";
   }
@@ -888,7 +814,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const j = jetzt(a), v = ansicht(a), rueck = v < j;
     let kopf;
     if (ui.kreismenue || ui.modus) {
-      kopf = `<div class="head"><div class="kopf-l"><p class="neben">Neue Anmerkung</p><h1 class="titel">${ui.modus ? "Stelle wählen" : "Art wählen"}</h1></div></div>`;
+      kopf = `<div class="head"><div class="kopf-l"><p class="neben">Neue Anmerkung${ui.kreismenue ? " · " + esc(bauteilName(a, ui.kreismenue.bauteil)) : ""}</p><h1 class="titel">${ui.modus ? "Stelle wählen" : "Art wählen"}</h1></div></div>`;
     } else if (rueck) {
       kopf = `<div class="rueck"><span>Rückblick · ${esc(langName(a, v))}</span><button type="button" data-act="jetzt" aria-label="Zurück ins Jetzt">×</button></div>`;
     } else {
@@ -899,11 +825,9 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const twin = `<div class="twin${traegerSel}" id="twin" data-twin="traeger" role="group" aria-label="Zwilling des Trägers ${a.traeger}">${zwillingSvg(a, ui.kreismenue && ui.kreismenue.bauteil)}${pins}</div>`;
     let unten;
     if (ui.kreismenue) {
-      unten = `<p class="text" style="margin-top:14px">Zum Symbol ziehen und loslassen.</p>
-        <p class="neben">Die Stelle ist schon gesetzt: ${esc(bauteilName(a, ui.kreismenue.bauteil))}.</p>
-        <p class="neben" style="margin-top:6px">Nur, was Zeit, Material oder eine Entscheidung gekostet hat.</p>`;
+      unten = "";
     } else if (ui.modus) {
-      unten = `<p class="neben geste">Tippen Sie auf die Stelle, die die Anmerkung betrifft.</p>`;
+      unten = "";
     } else if (rueck) {
       const liste = a.anmerkungen.filter(x => x.von === v);
       const zeilen = liste.map(x => `<button class="zeile" type="button" data-act="pin" data-id="${x.id}">${chip(x.art, "s")}<span class="rest"><span class="text">${ARTEN[x.art].name} · ${esc(bauteilName(a, x.bauteil))}</span></span>${ungelesen(a, x) ? '<i class="dot"></i>' : ""}</button>`).join("");
@@ -913,9 +837,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         ${zeitleiste(a)}
         <button class="btn umriss block" type="button" data-act="jetzt" style="margin-top:6px">Zurück zu jetzt</button>`;
     } else {
-      unten = (darfAnmerken(a) ? hinweis("langdruck", "Lang drücken: Anmerkung an dieser Stelle") : "")
-        + zeitleiste(a)
-        + (darfUebergeben(a) && ui.blatt === "zu" ? hinweis("uebergeben", `Punkt auf ${j + 1 === ende(a) ? "A" : j + 1} ziehen, um zu übergeben`) : "");
+      unten = zeitleiste(a);
     }
     return kopf + twin + unten + `<div class="platz${ui.blatt !== "zu" ? " gross" : ""}"></div>`;
   }
@@ -979,7 +901,6 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     return `<div class="head"><div class="kopf-l"><button class="textbtn" type="button" data-act="ebene" data-ebene="traeger" style="min-height:32px">‹ Träger ${a.id}</button>
         <h1 class="titel">${esc(b.name)}</h1></div></div>
       <div class="bwell"><div class="bpart${b.form === "rund" ? " rund" : ""}" id="bpart" data-twin="bauteil" style="aspect-ratio:${verhaeltnis};${groesse}">${pins}</div></div>
-      ${darfAnmerken(a) ? hinweis("langdruck", "Lang drücken: Anmerkung an dieser Stelle").replace("geste", "geste unter-well") : ""}
       <section class="karte"><h2 class="ktitel">Verlauf dieses Bauteils</h2><div class="verlauf">${zeilen}</div></section>
       <section class="karte"><h2 class="ktitel">Unterlagen</h2><div class="tags">${tags || '<span class="leer">Keine Unterlagen</span>'}</div></section>
       <div class="platz"></div>`;
@@ -989,12 +910,13 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   function viewLogistik() {
     const aktiv = state.auftraege.filter(a => a.logistik);
     const a = state.auftraege.find(q => q.id === ui.logAuftrag) || aktiv[0] || cur();
+    if (!a) return `<div class="head"><div class="kopf-l"><p class="werk">${ICO.lkw(18)} ${esc(LOGISTIK.name)}</p><h1 class="titel">Abholungen</h1><p class="neben">Keine Abholungen</p></div></div>`;
     const L = a.logistik;
     let inhalt;
     if (!L) {
       const j = jetzt(a);
       const wo = a.zurueck ? "beim Auftraggeber" : j === 0 ? "beim Auftraggeber" : `bei ${ort(a, j).name}, ${ort(a, j).titel}`;
-      inhalt = `<section class="karte"><h2 class="ktitel">Kein Transport offen</h2><p class="neben">Der Träger ist ${esc(wo)}. Sobald die Station übergibt, steht hier das nächste Ziel.</p></section>`;
+      inhalt = `<section class="karte"><h2 class="ktitel">Kein Transport offen</h2><p class="neben">Der Träger ist ${esc(wo)}.</p></section>`;
     } else {
       const von = ort(a, L.von), nach = ort(a, L.nach);
       const stufen = [["Benachrichtigt", L.zeit], ["Abgeholt", L.abgeholt], ["Zugestellt", L.zugestellt]];
@@ -1004,7 +926,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         ? `<button class="btn pri block" type="button" data-act="log-abholen">Abholung bestätigen</button>`
         : L.status === "abgeholt"
           ? `<button class="btn pri block" type="button" data-act="log-zustellen">Zustellung bestätigen</button>`
-          : `<p class="hinweiszeile">Zugestellt. ${esc(nach.name)} bestätigt den Empfang mit dem Scan.</p>`;
+          : `<p class="hinweiszeile">Zugestellt an ${esc(nach.name)}.</p>`;
       inhalt = `<section class="karte"><p class="beschr">Abholen bei</p><h2 class="ktitel">${esc(von.name)}</h2><p class="neben">${esc(von.titel)}</p><p class="text">${esc(von.adresse)}</p></section>
         <div class="pfeil" aria-hidden="true">↓</div>
         <section class="hero"><p class="oben">Liefern an</p><h2 class="btitel">${esc(nach.name)}</h2><p class="neben">${esc(nach.titel)}</p><p class="text">${esc(nach.adresse)}</p></section>
@@ -1015,7 +937,6 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     return `<div class="head"><div class="kopf-l"><p class="werk">${ICO.lkw(18)} ${esc(LOGISTIK.name)}</p><h1 class="titel">Träger ${a.traeger}</h1>
         <p class="neben">Auftrag ${a.id} · ${esc(a.titel)}</p></div></div>
       ${inhalt}
-      <p class="neben geste">Der Code am Träger zeigt immer das nächste Ziel. Er ändert sich, sobald eine Station übergibt.</p>
       ${andere ? `<section class="karte" style="margin-top:12px"><h2 class="ktitel">Weitere Abholungen</h2>${andere}</section>` : ""}<div class="platz"></div>`;
   }
 
@@ -1052,8 +973,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         const n = a.anmerkungen.filter(x => x.bezug === s.nr).length;
         return `<div class="zeile"><span class="rest"><span class="text">${langName(a, s.nr)}</span><span class="neben">${esc(WERK[s.werkstatt].name)}</span></span><span class="neben">${n} Anmerkung${n === 1 ? "" : "en"}</span></div>`;
       }).join("");
-      return { kopf, body: `<section class="hero"><p class="oben">Rückkehr</p><h2 class="titel">${a.abgeschlossen ? "Abgeschlossen" : "Alle Stationen fertig"}</h2>
-          <p class="neben">${a.abgeschlossen ? "Die Anmerkungen stehen in den Unterlagen der Stationen." : "Jede Anmerkung kommt in die Unterlagen der Station, die sie betrifft."}</p></section>
+      return { kopf, body: `<section class="hero"><p class="oben">Rückkehr</p><h2 class="titel">${a.abgeschlossen ? "Abgeschlossen" : "Alle Stationen fertig"}</h2></section>
         <section class="karte"><h2 class="ktitel">Anmerkungen je Station</h2>${zeilen}</section>
         ${a.abgeschlossen ? "" : `<div class="fusszeile"><button class="btn pri block" type="button" data-act="uebernehmen">In Unterlagen übernehmen</button></div>`}` };
     }
@@ -1103,11 +1023,9 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       const reihe = [["Logistik benachrichtigt", L.zeit], ["Abgeholt", L.abgeholt], ["Zugestellt", L.zugestellt]]
         .map(([n, z]) => `<div class="zeile">${z ? `<span style="color:var(--anp)">${ICO.haken}</span>` : '<span style="width:18px"></span>'}<span class="rest text">${n}</span><span class="neben">${z ? fmt(z) : "offen"}</span></div>`).join("");
       abholung = `<section class="karte"><h2 class="ktitel">Abholung</h2>${reihe}
-        <p class="hinweiszeile" style="margin:4px 0 0">Der Code am Träger führt jetzt zu ${esc(zu.titel === "Auftraggeber" ? "Auftraggeber" : zu.titel)}, ${esc(zu.name)}, ${esc(zu.adresse)}.</p></section>`;
+        <p class="hinweiszeile" style="margin:4px 0 0">Code am Träger · Ziel: ${esc(zu.titel === "Auftraggeber" ? "Auftraggeber" : zu.titel)}, ${esc(zu.name)}, ${esc(zu.adresse)}</p></section>`;
     } else if (s.status === "lieferung") {
-      abholung = `<section class="karte"><h2 class="ktitel">Lieferung</h2><p class="neben">${L ? esc(logistikStand(L)) : "Noch nicht abgeholt"}. Beim Eintreffen den Code am Träger scannen. Der Scan bestätigt den Empfang.</p></section>`;
-    } else if (s.status === "in-arbeit" && istMeine) {
-      abholung = `<section class="karte"><h2 class="ktitel">Abholung</h2><p class="neben">Nach dem Übergeben benachrichtigt die App die Logistik. Der Code am Träger zeigt dann die Adresse der nächsten Station.</p></section>`;
+      abholung = `<section class="karte"><h2 class="ktitel">Lieferung</h2><p class="neben">${L ? esc(logistikStand(L)) : "Noch nicht abgeholt"}</p></section>`;
     } else abholung = "";
     const empfang = s.empfang ? `<p class="neben" style="margin:0 0 12px">✓ Empfang bestätigt beim Scan · ${fmt(s.empfang)}</p>` : "";
     const uebernehmen = state.ich === "AG" && a.zurueck && !a.abgeschlossen
@@ -1120,12 +1038,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const kopf = `<div class="blatt-kopf"><p class="neben">Neue Anmerkung · ${esc(bauteilName(a, d.bauteil))}</p>
       <button class="zeile" type="button" data-act="zur-art" style="padding:0;min-height:44px" aria-label="Art ändern, jetzt ${ARTEN[d.art].name}">${chip(d.art, "m")}<span class="btitel">${ARTEN[d.art].name}</span></button></div>`;
     const foto = d.foto ? `<div class="fotobox"><img id="fotoImg" src="${d.foto}" alt="Foto zur Anmerkung"><canvas id="markcanvas" aria-label="Stelle auf dem Foto markieren"></canvas>
-        <button class="neu-auf" type="button" data-act="foto">neu aufnehmen</button></div><p class="neben" style="margin:0 0 10px">Mit dem Finger einen Kreis um die Stelle ziehen.</p>` : "";
+        <button class="neu-auf" type="button" data-act="foto">neu aufnehmen</button></div>` : "";
     const kacheln = `<div class="kacheln">
         <button class="kachel foto" type="button" data-act="foto">${ICO.kamera}<span>${d.foto ? "Foto ✓" : "Foto"}</span></button>
-        <button class="kachel memo" type="button" data-memo="neu">${ICO.mikro}<span>${d.memo ? "Memo ✓" : "Sprachmemo"}</span><small>halten und sprechen</small></button></div>`;
+        <button class="kachel memo" type="button" data-memo="neu">${ICO.mikro}<span>${d.memo ? "Memo ✓" : "Sprachmemo"}</span><small class="uhr"></small></button></div>`;
     const memo = d.memo ? memoZeile(d.dauer, "neu") : "";
-    const abschrift = d.memo ? `<label class="feld"><span class="beschr">Abschrift${d.beispiel ? " · Beispiel-Abschrift" : ""}</span><textarea data-bind="neu.abschrift" rows="3">${esc(d.abschrift)}</textarea></label>` : "";
+    const abschrift = d.memo ? `<label class="feld"><span class="beschr">Abschrift</span><textarea data-bind="neu.abschrift" rows="3">${esc(d.abschrift)}</textarea></label>` : "";
     // Bezug
     const knoten = [];
     for (let nr = 0; nr < ende(a); nr++) {
@@ -1139,26 +1057,17 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         <p class="gross">${esc(d.bezug === me && me !== 0 ? `Eigene Station · ${werkVon(a, me).verfahren}` : langName(a, d.bezug))}</p>
         <p class="neben">${esc(bezugGrund(a, d, me))}</p>
         ${d.aendern ? `<div class="knotenreihe">${knoten.join("")}</div>` : ""}</section>`;
-    const satz = d.bezug === me && me !== 0 ? "" : `<label class="feld"><span class="beschr">Was heißt das für ${d.bezug === 0 ? "den Auftraggeber" : `Station ${d.bezug}`}? (freiwillig)</span>
+    const satz = d.bezug === me && me !== 0 ? "" : `<label class="feld"><span class="beschr">Was heißt das für ${d.bezug === 0 ? "den Auftraggeber" : `Station ${d.bezug}`}?</span>
         <input data-bind="neu.satz" type="text" value="${esc(d.satz)}" autocomplete="off"></label>`;
     let wer;
     if (d.bezug === me && me !== 0) wer = "Bleibt bei Ihrer Station. Der Auftraggeber wird benachrichtigt.";
     else if (me === 0) wer = `Station ${d.bezug} wird benachrichtigt.`;
     else if (d.bezug === 0) wer = "Der Auftraggeber wird benachrichtigt.";
     else wer = `Station ${d.bezug} und der Auftraggeber werden benachrichtigt.`;
-    const body = kacheln + foto + memo + `<p class="neben" style="margin:0 0 10px">Das Memo wird automatisch abgeschrieben.</p>` + abschrift + bezug + satz
+    const body = kacheln + foto + memo + abschrift + bezug + satz
       + `<p class="hinweiszeile">${wer}</p>`
       + `<div class="fusszeile"><button class="btn pri block" type="button" data-act="senden" ${d.foto || d.memo ? "" : "disabled"}>Senden</button></div>`;
     return { kopf, body };
-  }
-
-  function beispielFoto(a, x) {
-    const b = a.bauteile.find(q => q.id === x.bauteil);
-    const rund = b && b.form === "rund";
-    return `<div class="foto-gross"><svg viewBox="0 0 320 180" role="img" aria-label="Beispielfoto mit markierter Stelle">
-      <rect width="320" height="180" style="fill:var(--well)"/>
-      ${rund ? '<ellipse cx="160" cy="92" rx="96" ry="62" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/>' : '<rect x="60" y="40" width="200" height="104" rx="14" style="fill:var(--card);stroke:var(--line)" stroke-width="2"/>'}
-      <circle cx="${60 + x.stelle.x * 200}" cy="${40 + x.stelle.y * 104}" r="24" fill="none" style="stroke:var(--alarm)" stroke-width="3"/></svg></div>`;
   }
 
   function blattAnmerkung(a) {
@@ -1173,9 +1082,9 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     if (!ok) {
       return { kopf, body: `<p class="hinweiszeile">Nur für die Beteiligten sichtbar.</p><div class="fusszeile"><button class="btn umriss block" type="button" data-act="blatt-zu">Schließen</button></div>` };
     }
-    const foto = x.foto === "beispiel" ? beispielFoto(a, x) : x.foto ? `<div class="foto-gross"><img src="${x.foto}" alt="Foto zur Anmerkung"></div>` : "";
+    const foto = x.foto ? `<div class="foto-gross"><img src="${x.foto}" alt="Foto zur Anmerkung"></div>` : "";
     const memo = x.dauer ? memoZeile(x.dauer, "anm:" + x.id) : "";
-    const abschrift = x.abschrift ? `<p class="beschr" style="margin:6px 0 4px">Abschrift${x.beispiel ? " · Beispiel-Abschrift" : ""}</p><p class="text" style="margin:0 0 12px">${esc(x.abschrift)}</p>` : "";
+    const abschrift = x.abschrift ? `<p class="beschr" style="margin:6px 0 4px">Abschrift</p><p class="text" style="margin:0 0 12px">${esc(x.abschrift)}</p>` : "";
     const sprech = x.heisstFuer ? `<div class="sprech">${fuerTxt(a, x.bezug)} heißt das: ${esc(x.heisstFuer)}</div>` : "";
     const antworten = x.antworten.map((t, i) => `<section class="karte klein"><p class="beschr">Antwort ${vonTxt(a, t.von)}${t.von === 0 ? "" : " · " + esc(werkVon(a, t.von).name)} · ${fmt(t.zeit)}</p>
         ${t.dauer ? memoZeile(t.dauer, `antw:${x.id}:${i}`) : ""}${t.abschrift ? `<p class="text" style="margin:0">${esc(t.abschrift)}</p>` : ""}</section>`).join("");
@@ -1188,7 +1097,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const x = findAnm(a, ui.offeneAnmerkung), d = ui.antwort;
     const kopf = `<div class="blatt-kopf"><div class="kopfzeile"><button class="rundknopf" type="button" data-act="zur-anmerkung" aria-label="Zurück zur Anmerkung">${ICO.zurueck}</button>
       <span class="btitel">Antworten</span></div><p class="neben">auf ${ARTEN[x.art].name} ${vonTxt(a, x.von)}</p></div>`;
-    const body = `<div class="kacheln" style="grid-template-columns:1fr"><button class="kachel memo" type="button" data-memo="antwort">${ICO.mikro}<span>${d.memo ? "Memo ✓" : "Sprachmemo"}</span><small>halten und sprechen</small></button></div>
+    const body = `<div class="kacheln" style="grid-template-columns:1fr"><button class="kachel memo" type="button" data-memo="antwort">${ICO.mikro}<span>${d.memo ? "Memo ✓" : "Sprachmemo"}</span><small class="uhr"></small></button></div>
       ${d.memo ? memoZeile(d.dauer, "antwort") : ""}
       <label class="feld"><span class="beschr">${d.memo ? "Abschrift" : "Oder als Text"}</span><textarea data-bind="antwort.text" rows="3">${esc(d.text)}</textarea></label>
       <div class="fusszeile"><button class="btn pri block" type="button" data-act="antwort-senden" id="antwortSenden" ${d.memo || d.text.trim() ? "" : "disabled"}>Senden</button></div>`;
@@ -1206,10 +1115,9 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const ziel = ort(a, nach);
     const naechste = `<section class="karte"><h2 class="ktitel">${nach === E ? "Rückkehr" : "Nächste Station"}</h2><div class="naechste"><span class="rund">${knotenText(a, nach)}</span>
       <div><p class="ktitel" style="font-weight:900">${esc(ziel.titel)}</p><p class="werk" style="font-size:14px">${esc(ziel.name)}</p><p class="neben">${esc(ziel.adresse)}</p></div></div></section>`;
-    const body = (eigeneOffen ? `<p class="hinweiszeile frage">Ihre Frage ist noch offen. Übergeben geht trotzdem.</p>` : "")
+    const body = (eigeneOffen ? `<p class="hinweiszeile frage">Ihre Frage ist noch offen.</p>` : "")
       + `<p class="beschr" style="margin:0 0 8px">Was mitreist</p>${zeilen || '<p class="leer" style="margin-bottom:8px">Keine eigenen Anmerkungen.</p>'}`
       + `<div style="height:6px"></div>` + naechste
-      + `<p class="hinweiszeile">Deckel schließen. Der Code am Träger zeigt der Logistik danach die Adresse von ${esc(ziel.name)}.</p>`
       + `<div class="fusszeile"><button class="btn pri block" type="button" data-act="uebergeben">Übergabe bestätigen</button></div>`;
     return { kopf, body };
   }
@@ -1228,11 +1136,11 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       <div class="punkte" aria-hidden="true">${P_TITEL.map((_, k) => `<i class="${k <= i ? "an" : ""}"></i>`).join("")}</div></div>`;
     let body = "";
     if (i === 0) {
-      body = `<label class="feld"><span class="beschr">Bezeichnung</span><input data-p="titel" type="text" value="${esc(p.titel)}" placeholder="z. B. Baugruppe, Muster 3" autocomplete="off"></label>
+      body = `<label class="feld"><span class="beschr">Bezeichnung</span><input data-p="titel" type="text" value="${esc(p.titel)}" autocomplete="off"></label>
         <div class="tasten"><label class="feld"><span class="beschr">Stückzahl</span><input data-p="stueckzahl" type="number" min="1" inputmode="numeric" value="${p.stueckzahl}"></label>
         <label class="feld"><span class="beschr">Termin</span><input data-p="termin" type="date" value="${esc(p.termin)}"></label></div>
         <label class="feld"><span class="beschr">Hinweise für alle Stationen</span><textarea data-p="hinweise" rows="2">${esc(p.hinweise)}</textarea></label>
-        <section class="karte"><div class="karte-top"><div><h2 class="ktitel">Bauteile im Träger</h2><p class="neben">Aus dem 3D-Modell. Der Zwilling zeigt sie im Sollzustand.</p></div></div>
+        <section class="karte"><div class="karte-top"><div><h2 class="ktitel">Bauteile im Träger</h2></div></div>
           <div class="kglied"><button class="mini-btn" type="button" data-act="p-bauteile" data-d="-1" aria-label="Weniger Bauteile" ${p.bauteile <= 1 ? "disabled" : ""}>−</button>
           <span class="titel num" style="min-width:40px;text-align:center">${p.bauteile}</span>
           <button class="mini-btn" type="button" data-act="p-bauteile" data-d="1" aria-label="Mehr Bauteile" ${p.bauteile >= 4 ? "disabled" : ""}>+</button></div></section>`;
@@ -1246,10 +1154,9 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       }).join("");
       const wahl = p.waehlen ? `<section class="karte wahl">${Object.keys(WERK).map(id => `<button class="zeile" type="button" data-act="p-werk" data-w="${id}">
           <span class="rest"><span class="ktitel">${esc(WERK[id].name)}</span><span class="neben">${esc(WERK[id].verfahren)} · ${esc(WERK[id].adresse)}</span></span><span class="textbtn">Hinzufügen</span></button>`).join("")}</section>` : "";
-      body = `<p class="neben" style="margin-bottom:10px">Die Reihenfolge ist der Weg des Trägers. Jede Werkstatt sieht ihre Station und die Kette.</p>
-        <div class="kette"><div class="kglied"><span class="knoten a">A</span><span class="rest"><span class="ktitel">Auftraggeber</span><span class="neben">Hier wird der Träger abgeholt</span></span></div>
+      body = `<div class="kette"><div class="kglied"><span class="knoten a">A</span><span class="rest"><span class="ktitel">Auftraggeber</span></span></div>
         ${glieder || '<div class="kglied"><span class="knoten a">?</span><span class="rest neben">Noch keine Werkstatt gewählt</span></div>'}
-        <div class="kglied"><span class="knoten a">A</span><span class="rest"><span class="ktitel">Rückkehr</span><span class="neben">Der Träger kommt zu Ihnen zurück</span></span></div></div>
+        <div class="kglied"><span class="knoten a">A</span><span class="rest"><span class="ktitel">Rückkehr</span></span></div></div>
         <button class="btn umriss block" type="button" data-act="p-waehlen" aria-expanded="${!!p.waehlen}" style="margin-bottom:12px">${p.waehlen ? "Liste schließen" : "+ Werkstatt hinzufügen"}</button>${wahl}`;
     } else if (i === 2) {
       const optStation = sel => `<option value="">Alle Stationen</option>` + p.stationen.map((s, k) => `<option value="${s.key}" ${sel === s.key ? "selected" : ""}>Station ${k + 1} · ${esc(WERK[s.w].name)}</option>`).join("");
@@ -1259,18 +1166,14 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
           <div class="reihe"><select data-pd="art" data-i="${k}" aria-label="Art der Unterlage">${arten.map(x => `<option ${x === u.art ? "selected" : ""}>${x}</option>`).join("")}</select>
           <input data-pd="index" data-i="${k}" value="${esc(u.index)}" aria-label="Index" style="width:64px"></div>
           <select data-pd="station" data-i="${k}" aria-label="Für welche Station">${optStation(u.station)}</select></div>`).join("");
-      body = `<p class="neben" style="margin-bottom:10px">Zeichnungen, 3D-Modelle, Prüfpläne. Legen Sie fest, welche Station welche Unterlage sieht.</p>
-        <div class="tasten" style="margin-bottom:12px"><button class="btn umriss" type="button" data-act="p-datei">Datei wählen</button><button class="btn umriss" type="button" data-act="p-beispiel">Beispiele</button></div>
-        <section class="karte">${zeilen || '<p class="leer">Noch keine Unterlagen. Sie lassen sich auch später ergänzen.</p>'}</section>`;
+      body = `<button class="btn umriss block" type="button" data-act="p-datei" style="margin-bottom:12px">Datei wählen</button>
+        <section class="karte">${zeilen || '<p class="leer">Noch keine Unterlagen.</p>'}</section>`;
     } else if (i === 3) {
       if (p.traeger) {
         body = `<div class="status fertig"><span class="ico">${ICO.haken}</span><div><p class="t">Träger ${p.traeger} gekoppelt</p><p class="u">Auftrag und Träger gehören jetzt zusammen.</p></div></div>
-          <p class="text" style="margin-bottom:8px">Wer diesen Code scannt, öffnet das Projekt.</p>
-          <p class="neben" style="margin-bottom:6px">Jede Werkstatt sieht ihre Station. Die Logistik sieht, wohin der Träger als Nächstes geht, und das Ziel ändert sich nach jeder Übergabe von selbst.</p>
           <button class="textbtn" type="button" data-act="p-scan-neu">Anderen Träger scannen</button>`;
       } else {
         body = `<div class="sucher">${p.scannt ? '<span class="linie"></span>' : `<span style="color:var(--pri)">${ICO.code}</span>`}<span class="ecke e1"></span><span class="ecke e2"></span><span class="ecke e3"></span><span class="ecke e4"></span></div>
-          <p class="text" style="margin-bottom:4px">Den Code am Träger scannen.</p><p class="neben" style="margin-bottom:12px">Damit gehören Auftrag und Träger zusammen. Im Prototyp wird der Scan simuliert.</p>
           <button class="btn dunkel block" type="button" data-act="p-scan" ${p.scannt ? "disabled" : ""}>${p.scannt ? "Scannt …" : "Code am Träger scannen"}</button>`;
       }
     } else {
@@ -1281,8 +1184,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       body = `<section class="karte"><p class="beschr">Auftrag</p><h2 class="ktitel">${esc(p.titel)}</h2><p class="neben">${p.stueckzahl} Stück · Termin ${fmtDatum(p.termin)} · ${p.bauteile} Bauteil${p.bauteile > 1 ? "e" : ""}</p></section>
         <section class="karte"><p class="beschr">Weg des Trägers</p>${weg}</section>
         <section class="karte"><p class="beschr">Unterlagen</p><div class="tags">${tags || '<span class="leer">Keine</span>'}</div></section>
-        <section class="karte"><p class="beschr">Träger</p><h2 class="ktitel">${p.traeger}</h2></section>
-        <p class="hinweiszeile">Nach dem Start holt ${esc(LOGISTIK.name)} den Träger bei Ihnen ab. Station 1 sieht die Lieferung.</p>`;
+        <section class="karte"><p class="beschr">Träger</p><h2 class="ktitel">${p.traeger}</h2></section>`;
     }
     body += `<div class="fusszeile"><div class="tasten"><button class="btn umriss" type="button" data-act="p-zurueck">${i === 0 ? "Abbrechen" : "Zurück"}</button>
       <button class="btn pri" type="button" data-act="p-weiter" id="pWeiter" ${projektWeiterOk(p) ? "" : "disabled"}>${i === 4 ? "Projekt starten" : "Weiter"}</button></div></div>`;
@@ -1298,7 +1200,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
   function render() {
     const a = cur();
-    if (ui.ansicht != null && ui.ansicht >= jetzt(a)) ui.ansicht = null;
+    if (!a && ui.ebene !== "alle") ui.ebene = "alle";
+    if (a && ui.ansicht != null && ui.ansicht >= jetzt(a)) ui.ansicht = null;
     renderScreen(a);
     renderSheet(a);
     renderFab(a);
@@ -1311,7 +1214,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   function renderScreen(a) {
     const scr = $("#screen");
     const altFl = $("#flaeche");
-    const schluessel = state.ich + "|" + ui.ebene + "|" + a.id;
+    const schluessel = state.ich + "|" + ui.ebene + "|" + (a ? a.id : "-");
     const altScroll = altFl && letzteEbene === schluessel ? altFl.scrollTop : 0;
     let html;
     if (state.ich === "LOG") html = viewLogistik();
@@ -1321,7 +1224,6 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const wird = state.auftraege.reduce((n, q) => n + q.anmerkungen.filter(x => x.wirdGesendet).length, 0);
     scr.innerHTML = `<div class="top">${state.ich === "LOG" ? "" : segHtml()}
         <button class="demo-auf" type="button" data-act="demo-auf" aria-label="Steuerung für die Vorführung öffnen"><span>${ICO.menue}</span></button>
-        ${ui.modus ? '<span class="modus">Tippen Sie auf die Stelle</span>' : ""}
         ${wird ? `<span class="pill st-geplant offline">${wird} Anmerkung${wird > 1 ? "en" : ""} wird gesendet</span>` : ""}</div>
       <div class="flaeche" id="flaeche">${html}</div>`;
     $("#flaeche").scrollTop = altScroll;
@@ -1368,7 +1270,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
   function renderFab(a) {
     const fab = $("#fab");
-    const zeigen = state.ich !== "LOG" && !ui.kreismenue && !ui.modus && ui.blatt === "zu" && darfAnmerken(a)
+    const zeigen = !!a && state.ich !== "LOG" && !ui.kreismenue && !ui.modus && ui.blatt === "zu" && darfAnmerken(a)
       && (ui.ebene === "traeger" || ui.ebene === "bauteil");
     fab.hidden = !zeigen;
     fab.style.bottom = ui.ebene === "traeger" ? "112px" : "24px";
@@ -1410,19 +1312,27 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
   function renderDemo() {
     const a = cur();
-    const L = a.logistik;
-    let ziel;
-    if (L) { const z = ort(a, L.nach); ziel = { t: `Liefern an ${z.name}`, u: `${z.titel} · ${z.adresse}` }; }
-    else if (a.zurueck) ziel = { t: "Beim Auftraggeber", u: "Kein Transport offen" };
-    else { const j = jetzt(a); const z = ort(a, j); ziel = { t: `Bei ${z.name}`, u: `${z.titel} · kein Transport offen` }; }
+    let code = "";
+    if (a) {
+      const L = a.logistik;
+      let ziel;
+      if (L) { const z = ort(a, L.nach); ziel = { t: `Liefern an ${z.name}`, u: `${z.titel} · ${z.adresse}` }; }
+      else if (a.zurueck) ziel = { t: "Beim Auftraggeber", u: "Kein Transport offen" };
+      else { const z = ort(a, jetzt(a)); ziel = { t: `Bei ${z.name}`, u: `${z.titel} · kein Transport offen` }; }
+      code = `<div class="gruppe"><p class="beschr">Code am Träger ${a.traeger}</p><div class="codekarte"><span class="ktitel">${esc(ziel.t)}</span><span class="neben">${esc(ziel.u)}</span></div></div>`;
+    }
+    const rollen = ROLLEN.map(r => {
+      const s = a && r.id.charAt(0) === "W" ? a.stationen.find(q => q.werkstatt === r.id) : null;
+      return `<button class="dbtn" type="button" data-rolle="${r.id}" aria-pressed="${state.ich === r.id}">${esc(r.label)}<small>${s ? `Station ${s.nr} · ` : ""}${esc(r.sub)}</small></button>`;
+    }).join("");
+    const traeger = a ? a.traeger : state.freieTraeger[0];
     $("#demo").innerHTML = `<div><p class="beschr">Prototype Carrier · Entwurf 2</p><h1>Träger-App</h1></div>
-      <p class="neben">Steuerung für die Vorführung. Ein Telefon gilt als die Werkstatt, die den Link zuletzt geöffnet hat.</p>
-      <div class="gruppe"><p class="beschr">Sicht</p>${ROLLEN.map(r => `<button class="dbtn" type="button" data-rolle="${r.id}" aria-pressed="${state.ich === r.id}">${r.label}<small>${esc(r.sub)}</small></button>`).join("")}</div>
+      <div class="gruppe"><p class="beschr">Sicht</p>${rollen}</div>
       <div class="gruppe"><p class="beschr">Vorführen</p>
-        <button class="dbtn" type="button" data-demo="scan">Code scannen<small>Träger ${a.traeger}</small></button>
-        <button class="dbtn" type="button" data-demo="abend">Abend simulieren<small>gesammelte Benachrichtigungen</small></button>
+        <button class="dbtn" type="button" data-demo="scan" ${traeger ? "" : "disabled"}>Code scannen<small>${traeger ? "Träger " + traeger : "Kein Träger"}</small></button>
+        <button class="dbtn" type="button" data-demo="abend">Abend simulieren</button>
         <button class="dbtn" type="button" data-demo="reset">Demo zurücksetzen</button></div>
-      <div class="gruppe"><p class="beschr">Der Code am Träger ${a.traeger} führt gerade</p><div class="codekarte"><span class="ktitel">${esc(ziel.t)}</span><span class="neben">${esc(ziel.u)}</span></div></div>
+      ${code}
       <button class="btn umriss block demo-zu" type="button" data-demo="zu">Schließen</button>`;
   }
 
@@ -1612,7 +1522,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const el = document.elementFromPoint(x, y);
     if (ui.ebene === "alle") {
       const k = el && el.closest(".tcard[data-id]");
-      if (k) { zaehleHinweis("aufziehen"); oeffneTraeger(k.dataset.id); }
+      if (k) { oeffneTraeger(k.dataset.id); }
     } else if (ui.ebene === "traeger") {
       const t = teilBei(x, y);
       if (t) oeffneBauteil(t.id);
@@ -1691,7 +1601,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const a = cur(), km = ui.kreismenue, me = meinNr(a);
     if (!km) return;
     const alt = ui.neu && ui.neu.bauteil === km.bauteil && ui.neu.stelle === km.stelle ? ui.neu : null;
-    ui.neu = Object.assign(alt || { foto: null, striche: [], memo: false, dauer: 0, audio: null, abschrift: "", beispiel: false, satz: "" },
+    ui.neu = Object.assign(alt || { foto: null, striche: [], memo: false, dauer: 0, audio: null, abschrift: "", satz: "" },
       { art, bauteil: km.bauteil, stelle: km.stelle, bezug: vorschlag(a, art, km.bauteil, me), gewaehlt: false, aendern: false });
     ui.kreismenue = null; ui.blatt = "neu"; ui.blattHoehe = "voll";
     render();
@@ -1701,7 +1611,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const a = cur(), d = ui.neu, me = meinNr(a);
     const x = anm({
       id: "N" + Date.now().toString(36), art: d.art, von: me, bezug: d.bezug, bauteil: d.bauteil, stelle: d.stelle,
-      foto: d.foto ? fotoMitMarkierung() : null, audio: d.audio, dauer: d.dauer, abschrift: d.abschrift.trim(), beispiel: d.beispiel,
+      foto: d.foto ? fotoMitMarkierung() : null, audio: d.audio, dauer: d.dauer, abschrift: d.abschrift.trim(),
       heisstFuer: d.bezug === me ? "" : d.satz.trim(), zeit: jetztIso(), gelesenVon: [state.ich], offen: d.art === "frage", wirdGesendet: !navigator.onLine
     });
     a.anmerkungen.push(x);
@@ -1748,7 +1658,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   /* Scan: Änderung 2. Ein Code für alle, die Sicht richtet sich nach der Rolle. */
   function scan(traegerId) {
     const a = traegerId ? state.auftraege.find(q => q.traeger === traegerId) : cur();
-    if (!a) { toast("Diesen Träger kennt die App nicht"); return; }
+    if (!a) {
+      const frei = traegerId || state.freieTraeger[0];
+      if (state.ich === "AG" && frei) { neuesProjekt(frei); toast(`Träger ${frei} ist frei`); }
+      else toast(frei ? `Träger ${frei} gehört noch zu keinem Auftrag` : "Unbekannter Träger");
+      return;
+    }
     state.aktuellerAuftrag = a.id;
     schliesseAlles();
     if (state.ich === "LOG") { ui.logAuftrag = a.id; render(); toast(a.logistik ? `Ziel: ${ort(a, a.logistik.nach).name}` : "Kein Transport offen"); return; }
@@ -1770,16 +1685,28 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     if (meldung) toast(meldung);
   }
 
+  /* Änderung 6: Projekt anlegen, auf Wunsch mit schon gescanntem Träger */
+  function neuesProjekt(traeger) {
+    schliesseAlles();
+    ui.ebene = "alle";
+    ui.projekt = { schritt: 0, titel: "", stueckzahl: 1, termin: "", hinweise: "", bauteile: 3, stationen: [], waehlen: true, unterlagen: [], traeger: traeger || null, scannt: false, n: 0 };
+    ui.blatt = "projekt"; ui.blattHoehe = "voll";
+    render();
+  }
+
   function setzeRolle(r) {
     state.ich = r;
     schliesseAlles();
     if (r === "LOG") ui.logAuftrag = null;
     else {
-      if (r !== "AG" && meinNr(cur()) == null) {
+      const a = cur();
+      if (a && r !== "AG" && meinNr(a) == null) {
         const m = state.auftraege.find(q => q.stationen.some(s => s.werkstatt === r));
         if (m) state.aktuellerAuftrag = m.id;
       }
-      ui.ebene = "traeger"; ui.ansicht = null; ui.bauteil = null;
+      const b = cur();
+      ui.ebene = b && (r === "AG" || meinNr(b) != null) ? "traeger" : "alle";
+      ui.ansicht = null; ui.bauteil = null;
     }
     verbergeNotif();
     render();
@@ -1789,7 +1716,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   function projektStarten() {
     const p = ui.projekt;
     const zahlen = state.auftraege.map(a => parseInt(a.id.slice(2), 10));
-    const id = "A-" + String(Math.max.apply(null, zahlen) + 1).padStart(4, "0");
+    const id = "A-" + String((zahlen.length ? Math.max.apply(null, zahlen) : 0) + 1).padStart(4, "0");
     const stationen = p.stationen.map((s, i) => ({ nr: i + 1, werkstatt: s.w, status: i === 0 ? "lieferung" : "geplant" }));
     const nrVonKey = {};
     p.stationen.forEach((s, i) => { nrVonKey[s.key] = i + 1; });
@@ -1833,7 +1760,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         const z = el.dataset.ebene;
         if (z === ui.ebene) break;
         if (z === "alle") zuAlle();
-        else if (z === "traeger") { if (ui.ebene === "bauteil") zurTraeger(); else oeffneTraeger(a.id); }
+        else if (z === "traeger" && a) { if (ui.ebene === "bauteil") zurTraeger(); else oeffneTraeger(a.id); }
         else if (z === "bauteil" && ui.bauteil) oeffneBauteil(ui.bauteil);
         break;
       }
@@ -1882,14 +1809,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       case "log-zustellen": {
         const q = state.auftraege.find(x => x.id === (ui.logAuftrag || "")) || state.auftraege.find(x => x.logistik);
         q.logistik.status = "zugestellt"; q.logistik.zugestellt = jetztIso(); q.logistik.ankunft = null; ui.logAuftrag = q.id;
-        post(rolleVon(q, q.logistik.nach), q, { titel: "Der Träger ist da", text: `${q.id} · Code scannen, um den Empfang zu bestätigen` }, true);
+        post(rolleVon(q, q.logistik.nach), q, { titel: "Der Träger ist da", text: `${q.id} · zugestellt von ${LOGISTIK.name}` }, true);
         render(); toast(`Zugestellt an ${ort(q, q.logistik.nach).name}`); break;
       }
       case "demo-auf": document.body.classList.add("demo-offen"); break;
       /* Projekt anlegen */
-      case "projekt-neu":
-        ui.projekt = { schritt: 0, titel: "", stueckzahl: 1, termin: "", hinweise: "", bauteile: 3, stationen: [], waehlen: true, unterlagen: [], traeger: null, scannt: false, n: 0 };
-        ui.blatt = "projekt"; ui.blattHoehe = "voll"; render(); break;
+      case "projekt-neu": neuesProjekt(null); break;
       case "p-zurueck": if (ui.projekt.schritt === 0) schliesseBlatt(); else { ui.projekt.schritt--; render(); } break;
       case "p-weiter": if (ui.projekt.schritt === 4) projektStarten(); else { ui.projekt.schritt++; letztesBlatt = null; render(); } break;
       case "p-bauteile": ui.projekt.bauteile = klemme(ui.projekt.bauteile + (+el.dataset.d), 1, 4); render(); break;
@@ -1905,9 +1830,6 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         render(); break;
       }
       case "p-datei": $("#dateiInput").click(); break;
-      case "p-beispiel":
-        ui.projekt.unterlagen.push({ name: "Zeichnung.pdf", art: "Zeichnung", index: "A", station: "" }, { name: "3D-Modell.step", art: "3D-Modell", index: "A", station: "" });
-        render(); break;
       case "p-dok-weg": ui.projekt.unterlagen.splice(+el.dataset.i, 1); render(); break;
       case "p-scan":
         ui.projekt.scannt = true; render();
@@ -1926,8 +1848,10 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     if (was === "zu") { document.body.classList.remove("demo-offen"); return; }
     document.body.classList.remove("demo-offen");
     if (was === "scan") {
-      const h = "#scan/" + a.traeger;
-      if (location.hash === h) scan(a.traeger); else location.hash = h;
+      const t = a ? a.traeger : state.freieTraeger[0];
+      if (!t) return;
+      const h = "#scan/" + t;
+      if (location.hash === h) scan(t); else location.hash = h;
     } else if (was === "abend") {
       const meine = state.warteschlange.filter(e => e.an === state.ich);
       if (!meine.length) { toast("Keine gesammelten Benachrichtigungen"); return; }
@@ -1938,7 +1862,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     } else if (was === "reset") {
       try { localStorage.removeItem(KEY); } catch (e) { /* leer */ }
       state = seed();
-      Object.assign(ui, { ebene: "traeger", bauteil: null, ansicht: null, offeneAnmerkung: null, logAuftrag: null, auftragAuf: false });
+      Object.assign(ui, { ebene: "alle", bauteil: null, ansicht: null, offeneAnmerkung: null, logAuftrag: null, auftragAuf: false });
       schliesseAlles();
       if (location.hash) history.replaceState(null, "", location.pathname + location.search);
       verbergeNotif();
@@ -1984,6 +1908,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       else if (ui.blatt !== "zu") schliesseBlatt();
       return;
     }
+    if (!a) return;
     if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-grip='peek']")) { e.preventDefault(); oeffneUnterlagen(); return; }
     if (state.ich === "LOG" || ui.blatt !== "zu" || ui.kreismenue) return;
     if (e.key === "ArrowLeft" && ui.ebene === "traeger") { e.preventDefault(); setzeAnsicht(ansicht(a) - 1); }
@@ -2112,7 +2037,6 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         return;
       }
       try { if (navigator.vibrate) navigator.vibrate(10); } catch (err) { /* ohne Vibration */ }
-      zaehleHinweis("langdruck");
       const x = g.x0, y = g.y0;
       g = { typ: "kreis", id: g.id };
       fange(g.id);
@@ -2174,7 +2098,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     sperreKlick();
     if (abbruch) { render(); return; }
     if (geste.typ === "tl") setzeAnsicht(geste.nr);
-    else if (geste.anteil > .5) { zaehleHinweis("uebergeben"); oeffneUebergabe(); }
+    else if (geste.anteil > .5) { oeffneUebergabe(); }
     else render();
   }
 
@@ -2309,8 +2233,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const text = aufn.text.trim();
     d.memo = true; d.dauer = sek;
     if (aufn.ziel === "antwort") { if (text && !d.text.trim()) d.text = text; }
-    else if (text) { d.abschrift = text; d.beispiel = false; }
-    else if (!d.abschrift) { d.abschrift = BEISPIEL_ABSCHRIFT; d.beispiel = true; }
+    else if (text) d.abschrift = text;
     render();
   }
   let spieler = null;
@@ -2321,7 +2244,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     else if (q === "antwort" && ui.antwort) src = ui.antwort.audio;
     else if (q && q.indexOf("anm:") === 0) { const x = findAnm(a, q.slice(4)); src = x && x.audio; }
     else if (q && q.indexOf("antw:") === 0) { const [, id, i] = q.split(":"); const x = findAnm(a, id); src = x && x.antworten[+i] && x.antworten[+i].audio; }
-    if (!src) { toast("Im Prototyp ohne Ton. Die Abschrift steht darunter."); return; }
+    if (!src) { toast("Kein Ton aufgenommen"); return; }
     if (spieler) { spieler.pause(); spieler = null; return; }
     spieler = new Audio(src);
     spieler.onended = () => { spieler = null; };
