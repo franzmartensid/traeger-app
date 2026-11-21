@@ -2265,6 +2265,23 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     }
     return false;
   }
+  /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
+     (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
+  const BUILD = "20261121103612";
+  let fassungGeprueft = 0;
+  async function pruefeFassung() {
+    if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
+    fassungGeprueft = Date.now();
+    try {
+      const r = await fetch(location.pathname + "?f=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) return;
+      const m = (await r.text()).match(/const BUILD = "(\d+)"/);
+      if (m && m[1] !== BUILD) location.replace(location.pathname + "?f=" + m[1] + location.hash);
+    } catch (e) { /* ohne Netz weiter mit dieser Fassung */ }
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pruefeFassung(); });
+  window.addEventListener("pageshow", pruefeFassung);
+  window.addEventListener("hashchange", pruefeFassung);
   window.addEventListener("hashchange", hashAuswerten);
   window.addEventListener("online", () => {
     let n = 0;
