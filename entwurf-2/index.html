@@ -443,6 +443,26 @@ img.view3d { object-fit: contain; padding: 28px; }
 .modellzeile input { border: 0; border-radius: 10px; background: var(--well); padding: 8px 10px; font: 800 16px/20px var(--font); color: var(--ink); min-height: 40px; width: 100%; }
 .modellreihe { display: flex; flex-wrap: wrap; gap: 8px; }
 .modellreihe img { height: 52px; max-width: 110px; background: var(--well); border-radius: 10px; padding: 6px; object-fit: contain; }
+
+/* ---------- Scanner ---------- */
+.trenner { stroke: var(--line-strong); stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+.scan-auf { position: absolute; left: 8px; top: 10px; width: 48px; height: 48px; border: 0; background: none; display: grid; place-items: center; z-index: 2; padding: 0; }
+.scan-auf span { width: 36px; height: 36px; border-radius: 50%; background: var(--card); box-shadow: var(--sh-1); display: grid; place-items: center; color: var(--pri); }
+.scanner { position: absolute; inset: 0; z-index: 60; background: var(--ink); overflow: hidden; }
+.scanner video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scan-kopf { position: absolute; left: 0; right: 0; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding: 20px; color: var(--card); background: linear-gradient(var(--scrim), transparent); }
+.scan-titel { font: 900 22px/28px var(--font); margin: 0; }
+.scan-wer { font: 700 14px/20px var(--font); margin: 2px 0 0; }
+.scan-zu { width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--card); color: var(--ink); font: 900 24px/1 var(--font); flex: 0 0 auto; }
+.scan-rahmen { position: absolute; left: 50%; top: 50%; width: min(68%, 280px); aspect-ratio: 1; transform: translate(-50%, -50%); z-index: 1; }
+.scan-rahmen i { position: absolute; width: 44px; height: 44px; border: 4px solid var(--card); }
+.scan-rahmen .e1 { left: 0; top: 0; border-right: 0; border-bottom: 0; border-radius: 14px 0 0 0; }
+.scan-rahmen .e2 { right: 0; top: 0; border-left: 0; border-bottom: 0; border-radius: 0 14px 0 0; }
+.scan-rahmen .e3 { left: 0; bottom: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 14px; }
+.scan-rahmen .e4 { right: 0; bottom: 0; border-left: 0; border-top: 0; border-radius: 0 0 14px 0; }
+.scan-fuss { position: absolute; left: 20px; right: 20px; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); z-index: 2; display: grid; justify-items: center; gap: 12px; color: var(--card); }
+.scan-text { font: 800 16px/22px var(--font); margin: 0; }
 </style>
 </head>
 <body>
@@ -460,6 +480,13 @@ img.view3d { object-fit: contain; padding: 28px; }
     <section class="sheet" id="sheet" hidden aria-label="Blatt"></section>
     <div class="kreis" id="kreis" hidden></div>
     <button class="notif" id="notif" type="button" hidden></button>
+    <div class="scanner" id="scanner" hidden role="dialog" aria-label="Code scannen">
+      <video id="scanVideo" playsinline muted></video>
+      <div class="scan-kopf"><div><p class="scan-titel" id="scanTitel">Code scannen</p><p class="scan-wer" id="scanWer"></p></div>
+        <button class="scan-zu" type="button" data-act="scan-zu" aria-label="Schließen">×</button></div>
+      <div class="scan-rahmen" aria-hidden="true"><i class="e1"></i><i class="e2"></i><i class="e3"></i><i class="e4"></i></div>
+      <div class="scan-fuss" id="scanFuss"></div>
+    </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <div class="gross-meldung" id="gross" hidden role="alert"></div>
   </div>
@@ -467,6 +494,454 @@ img.view3d { object-fit: contain; padding: 28px; }
 <input id="fotoInput" type="file" accept="image/*" capture="environment" hidden>
 <input id="dateiInput" type="file" multiple hidden>
 <input id="modellInput" type="file" multiple hidden>
+<input id="scanFoto" type="file" accept="image/*" hidden>
+<script>
+/* QR-Code lesen, ohne Bibliothek. Ablauf nach ISO/IEC 18004:
+   Schwellwert, Suchmuster, Ausrichtungsmuster, Perspektive, Format, Maske, Blöcke, Reed-Solomon, Daten.
+   Unterstützt Version 1 bis 20, Modi Ziffern, Alphanumerisch und Byte. */
+(function (wurzel) {
+  "use strict";
+
+  /* Blöcke je Version (1–20) und Fehlerstufe L, M, Q, H: [EC je Block, Anzahl1, Daten1, Anzahl2, Daten2] */
+  const BLOECKE = [[7,1,19,0,0],[10,1,16,0,0],[13,1,13,0,0],[17,1,9,0,0],[10,1,34,0,0],[16,1,28,0,0],[22,1,22,0,0],[28,1,16,0,0],[15,1,55,0,0],[26,1,44,0,0],[18,2,17,0,0],[22,2,13,0,0],[20,1,80,0,0],[18,2,32,0,0],[26,2,24,0,0],[16,4,9,0,0],[26,1,108,0,0],[24,2,43,0,0],[18,2,15,2,16],[22,2,11,2,12],[18,2,68,0,0],[16,4,27,0,0],[24,4,19,0,0],[28,4,15,0,0],[20,2,78,0,0],[18,4,31,0,0],[18,2,14,4,15],[26,4,13,1,14],[24,2,97,0,0],[22,2,38,2,39],[22,4,18,2,19],[26,4,14,2,15],[30,2,116,0,0],[22,3,36,2,37],[20,4,16,4,17],[24,4,12,4,13],[18,2,68,2,69],[26,4,43,1,44],[24,6,19,2,20],[28,6,15,2,16],[20,4,81,0,0],[30,1,50,4,51],[28,4,22,4,23],[24,3,12,8,13],[24,2,92,2,93],[22,6,36,2,37],[26,4,20,6,21],[28,7,14,4,15],[26,4,107,0,0],[22,8,37,1,38],[24,8,20,4,21],[22,12,11,4,12],[30,3,115,1,116],[24,4,40,5,41],[20,11,16,5,17],[24,11,12,5,13],[22,5,87,1,88],[24,5,41,5,42],[30,5,24,7,25],[24,11,12,7,13],[24,5,98,1,99],[28,7,45,3,46],[24,15,19,2,20],[30,3,15,13,16],[28,1,107,5,108],[28,10,46,1,47],[28,1,22,15,23],[28,2,14,17,15],[30,5,120,1,121],[26,9,43,4,44],[28,17,22,1,23],[28,2,14,19,15],[28,3,113,4,114],[26,3,44,11,45],[26,17,21,4,22],[26,9,13,16,14],[28,3,107,5,108],[26,3,41,13,42],[30,15,24,5,25],[28,15,15,10,16]];
+  /* Mittelpunkte der Ausrichtungsmuster je Version (1–20) */
+  const AUSR = [[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90]];
+  const STUFE_INDEX = { 1: 0, 0: 1, 3: 2, 2: 3 };   /* Formatbits L=01, M=00, Q=11, H=10 → Tabellenspalte */
+
+  /* Galois-Feld GF(256), Polynom 0x11D */
+  const EXP = new Uint8Array(512), LOG = new Uint8Array(256);
+  (function () { let x = 1; for (let i = 0; i < 255; i++) { EXP[i] = x; LOG[x] = i; x <<= 1; if (x & 0x100) x ^= 0x11d; } for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255]; })();
+  const mul = (a, b) => (a && b ? EXP[LOG[a] + LOG[b]] : 0);
+  const div = (a, b) => (a ? EXP[(LOG[a] + 255 - LOG[b]) % 255] : 0);
+  const pot = (a, n) => (a ? EXP[(LOG[a] * n) % 255] : (n ? 0 : 1));
+
+  /* Formatinformation: alle 32 gültigen Werte (BCH 15,5, Maske 0x5412) */
+  const FORMATE = [];
+  for (let d = 0; d < 32; d++) {
+    let v = d << 10;
+    for (let i = 14; i >= 10; i--) if (v & (1 << i)) v ^= 0x537 << (i - 10);
+    FORMATE.push([((d << 10) | v) ^ 0x5412, d]);
+  }
+  let PROT = null;
+  const prot = (...a) => { if (PROT) PROT.push(a.join(" ")); };
+  const bits1 = x => { let n = 0; while (x) { n += x & 1; x >>>= 1; } return n; };
+
+  /* ---------- Schwellwert: Graustufe gegen lokalen Mittelwert ---------- */
+  function schwelle(bild) {
+    const w = bild.width, h = bild.height, d = bild.data;
+    const grau = new Uint8Array(w * h);
+    for (let i = 0, j = 0; i < grau.length; i++, j += 4) grau[i] = (d[j] * 77 + d[j + 1] * 150 + d[j + 2] * 29) >> 8;
+    const I = new Uint32Array((w + 1) * (h + 1));
+    for (let y = 0; y < h; y++) {
+      let zeile = 0;
+      for (let x = 0; x < w; x++) { zeile += grau[y * w + x]; I[(y + 1) * (w + 1) + x + 1] = I[y * (w + 1) + x + 1] + zeile; }
+    }
+    const r = Math.max(8, Math.round(Math.min(w, h) / 12));
+    const bin = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      const y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1);
+      for (let x = 0; x < w; x++) {
+        const x0 = Math.max(0, x - r), x1 = Math.min(w, x + r + 1);
+        const summe = I[y1 * (w + 1) + x1] - I[y0 * (w + 1) + x1] - I[y1 * (w + 1) + x0] + I[y0 * (w + 1) + x0];
+        const n = (x1 - x0) * (y1 - y0);
+        bin[y * w + x] = grau[y * w + x] * n * 100 < summe * 92 ? 1 : 0;
+      }
+    }
+    return { w, h, bin };
+  }
+
+  /* ---------- Suchmuster 1:1:3:1:1 ---------- */
+  function verhaeltnis(sc, tol) {
+    let total = 0;
+    for (let i = 0; i < 5; i++) { if (!sc[i]) return false; total += sc[i]; }
+    if (total < 7) return false;
+    const m = total / 7, v = m * tol;
+    return Math.abs(m - sc[0]) < v && Math.abs(m - sc[1]) < v && Math.abs(3 * m - sc[2]) < 3 * v && Math.abs(m - sc[3]) < v && Math.abs(m - sc[4]) < v;
+  }
+  const mitteVonEnde = (sc, ende) => ende - sc[4] - sc[3] - sc[2] / 2;
+  function kreuz(B, lage, fest, maxC, total, senkrecht) {
+    const { w, h, bin } = B, lim = senkrecht ? h : w;
+    const at = i => (senkrecht ? bin[i * w + fest] : bin[fest * w + i]);
+    const sc = [0, 0, 0, 0, 0];
+    let i = lage;
+    while (i >= 0 && at(i)) { sc[2]++; i--; }
+    if (i < 0) return NaN;
+    while (i >= 0 && !at(i) && sc[1] <= maxC) { sc[1]++; i--; }
+    if (i < 0 || sc[1] > maxC) return NaN;
+    while (i >= 0 && at(i) && sc[0] <= maxC) { sc[0]++; i--; }
+    if (sc[0] > maxC) return NaN;
+    i = lage + 1;
+    while (i < lim && at(i)) { sc[2]++; i++; }
+    if (i === lim) return NaN;
+    while (i < lim && !at(i) && sc[3] < maxC) { sc[3]++; i++; }
+    if (i === lim || sc[3] >= maxC) return NaN;
+    while (i < lim && at(i) && sc[4] < maxC) { sc[4]++; i++; }
+    if (sc[4] >= maxC) return NaN;
+    const t2 = sc[0] + sc[1] + sc[2] + sc[3] + sc[4];
+    if (5 * Math.abs(t2 - total) >= 2 * total) return NaN;
+    return verhaeltnis(sc, 0.7) ? mitteVonEnde(sc, i) : NaN;
+  }
+  function suchmuster(B) {
+    const { w, h, bin } = B, liste = [];
+    const pruefe = (sc, y, xEnde) => {
+      const total = sc[0] + sc[1] + sc[2] + sc[3] + sc[4];
+      const cx = mitteVonEnde(sc, xEnde);
+      const cy = kreuz(B, y, Math.floor(cx), sc[2], total, true);
+      if (isNaN(cy)) return;
+      const cx2 = kreuz(B, Math.floor(cx), Math.floor(cy), sc[2], total, false);
+      if (isNaN(cx2)) return;
+      const modul = total / 7;
+      for (const c of liste) {
+        if (Math.abs(c.y - cy) <= modul && Math.abs(c.x - cx2) <= modul && Math.abs(c.m - modul) <= Math.max(1, c.m * 0.5)) {
+          const n = c.n + 1;
+          c.x = (c.x * c.n + cx2) / n; c.y = (c.y * c.n + cy) / n; c.m = (c.m * c.n + modul) / n; c.n = n;
+          return;
+        }
+      }
+      liste.push({ x: cx2, y: cy, m: modul, n: 1 });
+    };
+    for (let y = 0; y < h; y++) {
+      let sc = [0, 0, 0, 0, 0], zs = 0;
+      for (let x = 0; x < w; x++) {
+        if (bin[y * w + x]) { if (zs & 1) zs++; sc[zs]++; }
+        else if (!(zs & 1)) {
+          if (zs === 4) {
+            if (verhaeltnis(sc, 0.6)) pruefe(sc, y, x);
+            sc = [sc[2], sc[3], sc[4], 1, 0]; zs = 3;
+          } else { zs++; sc[zs]++; }
+        } else sc[zs]++;
+      }
+      if (zs === 4 && verhaeltnis(sc, 0.6)) pruefe(sc, y, w);
+    }
+    return liste;
+  }
+  const abst = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  /* Beste Dreiergruppen: gleiche Modulgröße, rechter Winkel, gleich lange Schenkel */
+  function dreier(liste) {
+    const k = liste.filter(c => c.n >= 2).sort((a, b) => b.n - a.n).slice(0, 10);
+    const pool = k.length >= 3 ? k : liste.slice().sort((a, b) => b.n - a.n).slice(0, 10);
+    const erg = [];
+    for (let i = 0; i < pool.length; i++) for (let j = i + 1; j < pool.length; j++) for (let l = j + 1; l < pool.length; l++) {
+      const t = [pool[i], pool[j], pool[l]];
+      const ms = t.map(c => c.m), mMin = Math.min.apply(null, ms), mMax = Math.max.apply(null, ms);
+      if (mMax > mMin * 1.5) continue;
+      const d = [abst(t[1], t[2]), abst(t[0], t[2]), abst(t[0], t[1])];
+      const hyp = d.indexOf(Math.max.apply(null, d));
+      const ecke = t[hyp], a = t[(hyp + 1) % 3], b = t[(hyp + 2) % 3];
+      const da = abst(ecke, a), db = abst(ecke, b), dc = d[hyp];
+      if (Math.min(da, db) < 10 * mMax) continue;
+      const score = Math.abs(dc * dc - da * da - db * db) / (dc * dc) + Math.abs(da - db) / Math.max(da, db) + (mMax - mMin) / mMax;
+      erg.push({ score, ecke, a, b });
+    }
+    erg.sort((p, q) => p.score - q.score);
+    return erg.slice(0, 4).map(e => {
+      let tr = e.a, bl = e.b;
+      const kreuzprodukt = (tr.x - e.ecke.x) * (bl.y - e.ecke.y) - (tr.y - e.ecke.y) * (bl.x - e.ecke.x);
+      if (kreuzprodukt < 0) { const z = tr; tr = bl; bl = z; }
+      return { tl: e.ecke, tr, bl };
+    });
+  }
+
+  /* ---------- Ausrichtungsmuster in der Nähe einer Schätzung ---------- */
+  function ausrichtung(B, ex, ey, m) {
+    const { w, h, bin } = B;
+    let best = null;
+    for (const fak of [4, 8, 14]) {
+      const r = Math.ceil(fak * m);
+      const x0 = Math.max(0, Math.floor(ex - r)), x1 = Math.min(w - 1, Math.ceil(ex + r));
+      const y0 = Math.max(0, Math.floor(ey - r)), y1 = Math.min(h - 1, Math.ceil(ey + r));
+      const nah = (a, soll) => Math.abs(a - soll) < soll * 0.75;
+      for (let y = y0; y <= y1; y++) {
+        let x = x0;
+        /* Läufe: hell, dunkel, hell mit je etwa einem Modul */
+        const laeufe = [];
+        while (x <= x1) { const v = bin[y * w + x]; let n = 0; while (x <= x1 && bin[y * w + x] === v) { n++; x++; } laeufe.push([v, n, x]); }
+        for (let k = 1; k + 1 < laeufe.length; k++) {
+          if (laeufe[k][0] !== 1 || laeufe[k - 1][0] !== 0 || laeufe[k + 1][0] !== 0) continue;
+          if (!nah(laeufe[k][1], m) || !nah(laeufe[k - 1][1], m) || !nah(laeufe[k + 1][1], m)) continue;
+          const cx = laeufe[k][2] - laeufe[k][1] / 2, ix = Math.floor(cx);
+          /* senkrecht prüfen */
+          let a = y, n1 = 0, n0 = 0, n2 = 0;
+          while (a >= 0 && bin[a * w + ix]) { n1++; a--; }
+          while (a >= 0 && !bin[a * w + ix] && n0 < 2 * m) { n0++; a--; }
+          let u = y + 1;
+          while (u < h && bin[u * w + ix]) { n1++; u++; }
+          while (u < h && !bin[u * w + ix] && n2 < 2 * m) { n2++; u++; }
+          if (!nah(n1, m) || !nah(n0, m) || !nah(n2, m)) continue;
+          const cy = u - n2 - n1 / 2;
+          const dist = Math.hypot(cx - ex, cy - ey);
+          if (!best || dist < best.dist) best = { x: cx, y: cy, dist };
+        }
+      }
+      if (best) return best;
+    }
+    return null;
+  }
+
+  /* ---------- Perspektive: Gitter → Bild ---------- */
+  function homographie(von, nach) {
+    const A = [], bvec = [];
+    for (let i = 0; i < 4; i++) {
+      const [u, v] = von[i], [x, y] = nach[i];
+      A.push([u, v, 1, 0, 0, 0, -u * x, -v * x]); bvec.push(x);
+      A.push([0, 0, 0, u, v, 1, -u * y, -v * y]); bvec.push(y);
+    }
+    for (let c = 0; c < 8; c++) {
+      let p = c;
+      for (let r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+      if (Math.abs(A[p][c]) < 1e-12) return null;
+      [A[c], A[p]] = [A[p], A[c]]; [bvec[c], bvec[p]] = [bvec[p], bvec[c]];
+      for (let r = 0; r < 8; r++) {
+        if (r === c) continue;
+        const f = A[r][c] / A[c][c];
+        for (let k = c; k < 8; k++) A[r][k] -= f * A[c][k];
+        bvec[r] -= f * bvec[c];
+      }
+    }
+    const H = bvec.map((v, i) => v / A[i][i]);
+    return (u, v) => { const z = H[6] * u + H[7] * v + 1; return [(H[0] * u + H[1] * v + H[2]) / z, (H[3] * u + H[4] * v + H[5]) / z]; };
+  }
+
+  /* ---------- Matrix auslesen ---------- */
+  function funktionsmuster(d, version) {
+    const f = new Uint8Array(d * d);
+    const feld = (x0, y0, bw, bh) => { for (let y = y0; y < y0 + bh; y++) for (let x = x0; x < x0 + bw; x++) if (x >= 0 && y >= 0 && x < d && y < d) f[y * d + x] = 1; };
+    feld(0, 0, 9, 9); feld(d - 8, 0, 8, 9); feld(0, d - 8, 9, 8);
+    const pos = AUSR[version - 1];
+    for (let i = 0; i < pos.length; i++) for (let j = 0; j < pos.length; j++) {
+      if ((i === 0 && j === 0) || (i === 0 && j === pos.length - 1) || (i === pos.length - 1 && j === 0)) continue;
+      feld(pos[i] - 2, pos[j] - 2, 5, 5);
+    }
+    feld(6, 9, 1, d - 17); feld(9, 6, d - 17, 1);
+    if (version > 6) { feld(d - 11, 0, 3, 6); feld(0, d - 11, 6, 3); }
+    return f;
+  }
+  const MASKEN = [
+    (i, j) => (i + j) % 2 === 0, (i) => i % 2 === 0, (i, j) => j % 3 === 0, (i, j) => (i + j) % 3 === 0,
+    (i, j) => (Math.floor(i / 2) + Math.floor(j / 3)) % 2 === 0, (i, j) => (i * j) % 2 + (i * j) % 3 === 0,
+    (i, j) => ((i * j) % 2 + (i * j) % 3) % 2 === 0, (i, j) => ((i + j) % 2 + (i * j) % 3) % 2 === 0
+  ];
+  function format(M, d) {
+    const g = (x, y) => M[y * d + x];
+    let a = 0, b = 0;
+    for (let i = 0; i < 6; i++) a = (a << 1) | g(i, 8);
+    a = (a << 1) | g(7, 8); a = (a << 1) | g(8, 8); a = (a << 1) | g(8, 7);
+    for (let j = 5; j >= 0; j--) a = (a << 1) | g(8, j);
+    for (let j = d - 1; j >= d - 7; j--) b = (b << 1) | g(8, j);
+    for (let i = d - 8; i < d; i++) b = (b << 1) | g(i, 8);
+    let best = null;
+    for (const [wert, daten] of FORMATE) for (const x of [a, b]) {
+      const n = bits1(wert ^ x);
+      if (!best || n < best.n) best = { n, daten };
+    }
+    return best && best.n <= 3 ? { stufe: STUFE_INDEX[best.daten >> 3], maske: best.daten & 7 } : null;
+  }
+
+  /* Reed-Solomon: Berlekamp-Massey, Chien, Forney (erste Nullstelle α^0) */
+  function rs(cw, nEc) {
+    const n = cw.length, S = [];
+    let fehler = false;
+    for (let i = 0; i < nEc; i++) { let s = 0; for (let k = 0; k < n; k++) s = mul(s, EXP[i]) ^ cw[k]; S.push(s); if (s) fehler = true; }
+    if (!fehler) return true;
+    let C = [1], Bp = [1], L = 0, m = 1, b = 1;
+    for (let r = 0; r < nEc; r++) {
+      let d = S[r];
+      for (let i = 1; i <= L; i++) d ^= mul(C[i] || 0, S[r - i]);
+      if (d === 0) { m++; continue; }
+      const T = C.slice(), f = div(d, b);
+      while (C.length < Bp.length + m) C.push(0);
+      for (let i = 0; i < Bp.length; i++) C[i + m] ^= mul(f, Bp[i]);
+      if (2 * L <= r) { L = r + 1 - L; Bp = T; b = d; m = 1; } else m++;
+    }
+    if (2 * L > nEc) return false;
+    const pos = [];
+    for (let k = 0; k < n; k++) {
+      const xinv = EXP[(255 - ((n - 1 - k) % 255)) % 255];
+      let v = 0, p = 1;
+      for (let i = 0; i < C.length; i++) { v ^= mul(C[i], p); p = mul(p, xinv); }
+      if (v === 0) pos.push(k);
+    }
+    if (pos.length !== L) return false;
+    const Om = new Array(nEc).fill(0);
+    for (let i = 0; i < nEc; i++) for (let j = 0; j < C.length && j <= i; j++) Om[i] ^= mul(S[i - j], C[j]);
+    for (const k of pos) {
+      const e = (n - 1 - k) % 255, X = EXP[e], xinv = EXP[(255 - e) % 255];
+      let om = 0, p = 1;
+      for (let i = 0; i < nEc; i++) { om ^= mul(Om[i], p); p = mul(p, xinv); }
+      let dl = 0;
+      for (let i = 1; i < C.length; i += 2) dl ^= mul(C[i], pot(xinv, i - 1));
+      if (!dl) return false;
+      cw[k] ^= mul(X, div(om, dl));
+    }
+    for (let i = 0; i < nEc; i++) { let s = 0; for (let k = 0; k < n; k++) s = mul(s, EXP[i]) ^ cw[k]; if (s) return false; }
+    return true;
+  }
+
+  function daten(bytes, version) {
+    let bit = 0;
+    const gesamt = bytes.length * 8;
+    const lies = n => { let v = 0; for (let i = 0; i < n; i++) { v = (v << 1) | ((bytes[bit >> 3] >> (7 - (bit & 7))) & 1); bit++; } return v; };
+    const zahl = arr => (version <= 9 ? arr[0] : version <= 26 ? arr[1] : arr[2]);
+    const ALNUM = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
+    const aus = [];
+    while (gesamt - bit >= 4) {
+      const modus = lies(4);
+      if (modus === 0) break;
+      if (modus === 7) { const e = lies(8); if ((e & 0xc0) === 0x80) lies(8); else if ((e & 0xe0) === 0xc0) lies(16); continue; }
+      if (modus === 4) {
+        const n = lies(zahl([8, 16, 16]));
+        if (n * 8 > gesamt - bit) return null;
+        for (let i = 0; i < n; i++) aus.push(lies(8));
+      } else if (modus === 2) {
+        let n = lies(zahl([9, 11, 13]));
+        if (n * 5.5 > gesamt - bit + 6) return null;
+        while (n >= 2) { const v = lies(11); aus.push(ALNUM.charCodeAt(Math.floor(v / 45)), ALNUM.charCodeAt(v % 45)); n -= 2; }
+        if (n) aus.push(ALNUM.charCodeAt(lies(6)));
+      } else if (modus === 1) {
+        let n = lies(zahl([10, 12, 14]));
+        if (n * 3.3 > gesamt - bit + 4) return null;
+        const ziff = (v, s) => String(v).padStart(s, "0").split("").forEach(c => aus.push(c.charCodeAt(0)));
+        while (n >= 3) { ziff(lies(10), 3); n -= 3; }
+        if (n === 2) ziff(lies(7), 2); else if (n === 1) ziff(lies(4), 1);
+      } else return null;
+    }
+    try { return new TextDecoder("utf-8", { fatal: false }).decode(new Uint8Array(aus)); } catch (e) { return null; }
+  }
+
+  function matrixLesen(M, d) {
+    const version = (d - 17) / 4;
+    if (version < 1 || version > 20 || version % 1) return null;
+    const fmt = format(M, d);
+    if (!fmt) { prot("format?"); return null; }
+    const f = funktionsmuster(d, version), maske = MASKEN[fmt.maske];
+    const roh = [];
+    let byte = 0, n = 0, hoch = true;
+    for (let j = d - 1; j > 0; j -= 2) {
+      if (j === 6) j--;
+      for (let c = 0; c < d; c++) {
+        const i = hoch ? d - 1 - c : c;
+        for (let s = 0; s < 2; s++) {
+          const x = j - s;
+          if (f[i * d + x]) continue;
+          let v = M[i * d + x];
+          if (maske(i, x)) v ^= 1;
+          byte = (byte << 1) | v; n++;
+          if (n === 8) { roh.push(byte); byte = 0; n = 0; }
+        }
+      }
+      hoch = !hoch;
+    }
+    const [ec, n1, d1, n2, d2] = BLOECKE[(version - 1) * 4 + fmt.stufe];
+    const anzahl = n1 + n2, total = n1 * (d1 + ec) + n2 * (d2 + ec);
+    if (roh.length < total) return null;
+    const bl = [];
+    for (let i = 0; i < n1; i++) bl.push({ nd: d1, cw: new Array(d1 + ec) });
+    for (let i = 0; i < n2; i++) bl.push({ nd: d2, cw: new Array(d2 + ec) });
+    let o = 0;
+    const kurz = d1;
+    for (let i = 0; i < kurz; i++) for (let k = 0; k < anzahl; k++) bl[k].cw[i] = roh[o++];
+    for (let k = n1; k < anzahl; k++) bl[k].cw[kurz] = roh[o++];
+    for (let i = kurz; i < kurz + ec; i++) for (let k = 0; k < anzahl; k++) bl[k].cw[k < n1 ? i : i + 1] = roh[o++];
+    const nutz = [];
+    for (const b of bl) { if (!rs(b.cw, ec)) { prot("rs", "v" + version, "stufe" + fmt.stufe); return null; } for (let i = 0; i < b.nd; i++) nutz.push(b.cw[i]); }
+    return daten(nutz, version);
+  }
+
+  /* Modulgröße entlang der Verbindung zweier Suchmuster: Mitte → Rand des äußeren Rings = 3,5 Module.
+     Unabhängig von der Drehung des Codes. */
+  function strecke(B, x0, y0, dx, dy) {
+    const { w, h, bin } = B;
+    let z = 0;
+    for (let t = 0; t < 600; t += 0.5) {
+      const x = Math.round(x0 + dx * t), y = Math.round(y0 + dy * t);
+      if (x < 0 || y < 0 || x >= w || y >= h) return NaN;
+      const v = bin[y * w + x];
+      if (z === 0 && !v) z = 1; else if (z === 1 && v) z = 2; else if (z === 2 && !v) return t;
+    }
+    return NaN;
+  }
+  function modulZwischen(B, a, b) {
+    const L = abst(a, b);
+    if (!L) return NaN;
+    const dx = (b.x - a.x) / L, dy = (b.y - a.y) / L, werte = [];
+    for (const [p, sx, sy] of [[a, dx, dy], [a, -dx, -dy], [b, -dx, -dy], [b, dx, dy]]) {
+      const t = strecke(B, p.x, p.y, sx, sy);
+      if (!isNaN(t)) werte.push(t);
+    }
+    if (!werte.length) return NaN;
+    werte.sort((p, q) => p - q);
+    const mitte = werte[Math.floor(werte.length / 2)];
+    const gut = werte.filter(v => Math.abs(v - mitte) <= mitte * 0.3);
+    return gut.reduce((x, v) => x + v, 0) / gut.length / 3.5;
+  }
+  function versuche(B, drei) {
+    const { w, h, bin } = B, { tl, tr, bl } = drei;
+    const mf = (tl.m + tr.m + bl.m) / 3;
+    let m1 = modulZwischen(B, tl, tr), m2 = modulZwischen(B, tl, bl);
+    if (!(m1 > 0)) m1 = mf;
+    if (!(m2 > 0)) m2 = mf;
+    const m = (m1 + m2) / 2;
+    const roh = Math.round((abst(tl, tr) / m1 + abst(tl, bl) / m2) / 2) + 7;
+    let basis = roh;
+    if ((basis & 3) === 0) basis++; else if ((basis & 3) === 2) basis--; else if ((basis & 3) === 3) basis -= 2;
+    const brX = tr.x - tl.x + bl.x, brY = tr.y - tl.y + bl.y;
+    for (const d of [basis, basis + 4, basis - 4]) {
+      if (d < 21 || d > 97) continue;
+      /* Viertes Bezugsmuster: gefundenes Ausrichtungsmuster, sonst die Schätzung */
+      const ziele = [];
+      if (d > 21) {
+        const k = 1 - 3 / (d - 7);
+        const ex = tl.x + k * (brX - tl.x), ey = tl.y + k * (brY - tl.y);
+        const al = ausrichtung(B, ex, ey, m);
+        if (al) ziele.push([[al.x, al.y], [d - 6.5, d - 6.5]]);
+        ziele.push([[ex, ey], [d - 6.5, d - 6.5]]);
+      } else ziele.push([[brX, brY], [d - 3.5, d - 3.5]]);
+      for (const [ziel, gitter] of ziele) {
+        const H = homographie([[3.5, 3.5], [d - 3.5, 3.5], gitter, [3.5, d - 3.5]], [[tl.x, tl.y], [tr.x, tr.y], ziel, [bl.x, bl.y]]);
+        if (!H) continue;
+        const M = new Uint8Array(d * d);
+        let draussen = 0;
+        /* Jedes Modul per Mehrheit aus fünf Punkten um die Mitte */
+        const PUNKTE = [[0.5, 0.5]];
+        for (let y = 0; y < d; y++) for (let x = 0; x < d; x++) {
+          let dunkel = 0, n = 0;
+          for (const [ox, oy] of PUNKTE) {
+            const [px, py] = H(x + ox, y + oy);
+            const ix = Math.round(px), iy = Math.round(py);
+            if (ix < 0 || iy < 0 || ix >= w || iy >= h) continue;
+            n++; dunkel += bin[iy * w + ix];
+          }
+          if (!n) { draussen++; continue; }
+          M[y * d + x] = dunkel * 2 > n ? 1 : 0;
+        }
+        if (draussen > d * d * 0.05) continue;
+        prot("d", d, "roh", roh, "al", ziel.map(Math.round).join(","));
+        const text = matrixLesen(M, d);
+        if (text != null) return text;
+      }
+    }
+    return null;
+  }
+
+  /* Bild: { data: RGBA, width, height } → Text oder null */
+  function lesen(bild) {
+    const B = schwelle(bild);
+    const liste = suchmuster(B);
+    prot("muster", liste.length, liste.filter(c => c.n >= 2).length);
+    if (liste.length < 3) return null;
+    const dd = dreier(liste); prot("dreier", dd.length);
+    for (const drei of dd) {
+      const t = versuche(B, drei);
+      if (t != null) return t;
+    }
+    return null;
+  }
+
+  const QR = { lesen, _rs: rs, _matrixLesen: matrixLesen, _prot: p => { PROT = p; } };
+  if (typeof module !== "undefined" && module.exports) module.exports = QR;
+  else wurzel.QRLeser = QR;
+})(typeof window !== "undefined" ? window : this);
+</script>
 <script>
 (function () {
   "use strict";
@@ -513,6 +988,7 @@ img.view3d { object-fit: contain; padding: 28px; }
     lkw: (s = 36) => `<svg width="${s}" height="${s}" viewBox="0 0 36 36" ${STROKE}><path d="M3 9h18v15H3zM21 14h7l5 5v5H21z"/><circle cx="9" cy="26" r="3"/><circle cx="27" cy="26" r="3"/></svg>`,
     glocke: `<svg width="20" height="20" viewBox="0 0 20 20" ${STROKE}><path d="M5 14V9a5 5 0 0 1 10 0v5l1.5 2h-13zM8 18h4"/></svg>`,
     code: `<svg width="56" height="56" viewBox="0 0 56 56" ${STROKE}><rect x="6" y="6" width="16" height="16" rx="2"/><rect x="34" y="6" width="16" height="16" rx="2"/><rect x="6" y="34" width="16" height="16" rx="2"/><path d="M34 34h6v6M50 34v4M44 50h6v-6M34 46v4"/></svg>`,
+    scan: `<svg width="22" height="22" viewBox="0 0 22 22" ${STROKE}><path d="M2 7V4a2 2 0 0 1 2-2h3M15 2h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M7 20H4a2 2 0 0 1-2-2v-3M6 11h10"/></svg>`,
     haken: `<svg width="18" height="18" viewBox="0 0 18 18" ${STROKE}><path d="m4 9.5 3.2 3L14 6"/></svg>`,
     menue: `<svg width="18" height="18" viewBox="0 0 18 18" ${STROKE}><path d="M3 5h12M3 9h12M3 13h12"/></svg>`,
     abspielen: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 2.5v9l7.5-4.5z" style="fill:var(--card)"/></svg>'
@@ -736,7 +1212,14 @@ img.view3d { object-fit: contain; padding: 28px; }
         : `<rect class="${cls}" x="${b.x}" y="${y}" width="${b.w}" height="${h}" rx="3.4" ry="3.4"/>`);
       return `<g data-bt="${b.id}">${s ? form("halo") : ""}${form(s ? "part sel" : "part")}</g>`;
     }).join("");
-    return `<svg viewBox="0 0 100 80" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${teile}</svg>`;
+    const modelle = a.bauteile.filter(b => b.form === "modell").sort((p, q) => p.x - q.x);
+    let linien = "";
+    for (let i = 0; i + 1 < modelle.length; i++) {
+      const r = modelle[i].x + modelle[i].w, l = modelle[i + 1].x;
+      if (l - r < 0.5) { linien = ""; break; }
+      linien += `<line class="trenner" x1="${(r + l) / 2}" y1="4" x2="${(r + l) / 2}" y2="76"/>`;
+    }
+    return `<svg viewBox="0 0 100 80" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${linien}${teile}</svg>`;
   }
   function pinPos(a, x) {
     if (!x.bauteil) return { x: klemme(x.stelle.x * 100, 4, 96), y: klemme(x.stelle.y * 100, 5, 95) };
@@ -1209,8 +1692,8 @@ img.view3d { object-fit: contain; padding: 28px; }
         body = `<div class="status fertig"><span class="ico">${ICO.haken}</span><div><p class="t">Träger ${p.traeger} gekoppelt</p><p class="u">Auftrag und Träger gehören jetzt zusammen.</p></div></div>
           <button class="textbtn" type="button" data-act="p-scan-neu">Anderen Träger scannen</button>`;
       } else {
-        body = `<div class="sucher">${p.scannt ? '<span class="linie"></span>' : `<span style="color:var(--pri)">${ICO.code}</span>`}<span class="ecke e1"></span><span class="ecke e2"></span><span class="ecke e3"></span><span class="ecke e4"></span></div>
-          <button class="btn dunkel block" type="button" data-act="p-scan" ${p.scannt ? "disabled" : ""}>${p.scannt ? "Scannt …" : "Code am Träger scannen"}</button>`;
+        body = `<div class="sucher"><span style="color:var(--pri)">${ICO.code}</span><span class="ecke e1"></span><span class="ecke e2"></span><span class="ecke e3"></span><span class="ecke e4"></span></div>
+          <button class="btn dunkel block" type="button" data-act="p-scan">Code am Träger scannen</button>`;
       }
     } else {
       const weg = `<div class="kette"><div class="kglied"><span class="knoten a">A</span><span class="rest text">${esc(AUFTRAGGEBER.name)}</span></div>
@@ -1387,28 +1870,33 @@ img.view3d { object-fit: contain; padding: 28px; }
     u.drawImage(bild, 0, 0);
     return umriss.toDataURL("image/png");
   }
-  /* Anordnung im Träger: maßstabsgleich, in Reihen, so groß wie möglich (Trägerfläche 100 × 80) */
+  /* Anordnung im Träger: alle Bauteile in einer Reihe nebeneinander, maßstabsgleich, so groß wie möglich.
+     Zwischen den Bauteilen bleibt Platz für eine Trennlinie. */
   function packe(liste) {
-    const W = 100, H = 80, M = 7, G = 5;
-    const teile = liste.map((m, i) => ({ i, w: Math.max(m.ext[0], 1e-6), d: Math.max(m.ext[2], 1e-6) })).sort((p, q) => q.d - p.d);
-    const versuch = s => {
-      let x = M, y = M, zeile = 0;
-      const lage = [];
-      for (const t of teile) {
-        const w = t.w * s, d = t.d * s;
-        if (w > W - 2 * M + 1e-9) return null;
-        if (x + w > W - M + 1e-9) { x = M; y += zeile + G; zeile = 0; }
-        lage[t.i] = { x, y, w, d };
-        x += w + G; zeile = Math.max(zeile, d);
-      }
-      return y + zeile <= H - M + 1e-9 ? lage : null;
-    };
-    let lo = 0, hi = Math.min.apply(null, teile.map(t => Math.min((W - 2 * M) / t.w, (H - 2 * M) / t.d)));
-    if (!versuch(hi)) { for (let k = 0; k < 40; k++) { const mid = (lo + hi) / 2; if (versuch(mid)) lo = mid; else hi = mid; } hi = lo; }
-    const lage = versuch(hi) || teile.map(() => ({ x: M, y: M, w: 10, d: 10 }));
-    const x1 = Math.max.apply(null, lage.map(l => l.x + l.w)), y1 = Math.max.apply(null, lage.map(l => l.y + l.d));
-    const dx = (W - x1 - M) / 2, dy = (H - y1 - M) / 2;
-    return lage.map(l => ({ x: l.x + dx, y: (l.y + dy) / H * 100, w: l.w, h: l.d / H * 100 }));
+    const W = 100, H = 80, M = 7, G = 7, n = liste.length;
+    const ws = liste.map(m => Math.max(m.ext[0], 1e-6)), ds = liste.map(m => Math.max(m.ext[2], 1e-6));
+    const s = Math.min((W - 2 * M - (n - 1) * G) / ws.reduce((a, b) => a + b, 0), (H - 2 * M) / Math.max.apply(null, ds));
+    let x = (W - (ws.reduce((a, b) => a + b * s, 0) + (n - 1) * G)) / 2;
+    return liste.map((m, i) => {
+      const w = ws[i] * s, d = ds[i] * s, l = { x, y: (H - d) / 2 / H * 100, w, h: d / H * 100 };
+      x += w + G;
+      return l;
+    });
+  }
+  function reiheMassstab(liste, hoch) {
+    const W = 100, H = 80, M = 7, G = 7, n = liste.length;
+    const ws = liste.map(m => (hoch ? m.ext[2] : m.ext[0])), ds = liste.map(m => (hoch ? m.ext[0] : m.ext[2]));
+    return Math.min((W - 2 * M - (n - 1) * G) / ws.reduce((a, b) => a + b, 0), (H - 2 * M) / Math.max.apply(null, ds));
+  }
+  /* Bauteil um 90° um die Hochachse drehen, damit es in der Reihe mehr Platz bekommt */
+  function drehe90(m) {
+    const pos = new Float32Array(m.pos.length), nor = new Float32Array(m.nor.length);
+    for (let i = 0; i < pos.length; i += 3) {
+      pos[i] = m.pos[i + 2]; pos[i + 1] = m.pos[i + 1]; pos[i + 2] = -m.pos[i];
+      nor[i] = m.nor[i + 2]; nor[i + 1] = m.nor[i + 1]; nor[i + 2] = -m.nor[i];
+    }
+    const g = grenzen(pos);
+    return { pos, nor, min: g.min, max: g.max, ext: g.ext };
   }
   async function leseModellDatei(f) {
     const endung = ((f.name.match(/\.([^.]+)$/) || [])[1] || "").toLowerCase();
@@ -1619,7 +2107,7 @@ img.view3d { object-fit: contain; padding: 28px; }
     else if (ui.ebene === "bauteil") html = viewBauteil(a);
     else html = viewTraeger(a);
     const wird = state.auftraege.reduce((n, q) => n + q.anmerkungen.filter(x => x.wirdGesendet).length, 0);
-    scr.innerHTML = `<div class="top">${state.ich === "LOG" ? "" : segHtml()}
+    scr.innerHTML = `<div class="top"><button class="scan-auf" type="button" data-act="scan-oeffnen" aria-label="Code am Träger scannen"><span>${ICO.scan}</span></button>${state.ich === "LOG" ? "" : segHtml()}
         <button class="demo-auf" type="button" data-act="demo-auf" aria-label="Steuerung für die Vorführung öffnen"><span>${ICO.menue}</span></button>
         ${wird ? `<span class="pill st-geplant offline">${wird} Anmerkung${wird > 1 ? "en" : ""} wird gesendet</span>` : ""}</div>
       <div class="flaeche" id="flaeche">${html}</div>`;
@@ -1729,7 +2217,7 @@ img.view3d { object-fit: contain; padding: 28px; }
     $("#demo").innerHTML = `<div><p class="beschr">Prototype Carrier · Entwurf 2</p><h1>Träger-App</h1></div>
       <div class="gruppe"><p class="beschr">Sicht</p>${rollen}</div>
       <div class="gruppe"><p class="beschr">Vorführen</p>
-        <button class="dbtn" type="button" data-demo="scan" ${traeger ? "" : "disabled"}>Code scannen<small>${traeger ? "Träger " + traeger : "Kein Träger"}</small></button>
+        <button class="dbtn" type="button" data-demo="scan" ${traeger ? "" : "disabled"}>Scan simulieren<small>${traeger ? "Träger " + traeger : "Kein Träger"}</small></button>
         <button class="dbtn" type="button" data-demo="abend">Abend simulieren</button>
         <button class="dbtn" type="button" data-demo="reset">Demo zurücksetzen</button></div>
       ${code}
@@ -2058,7 +2546,9 @@ img.view3d { object-fit: contain; padding: 28px; }
 
   /* Scan: Änderung 2. Ein Code für alle, die Sicht richtet sich nach der Rolle. */
   function scan(traegerId) {
-    const a = traegerId ? state.auftraege.find(q => q.traeger === traegerId) : cur();
+    const a = traegerId
+      ? state.auftraege.find(q => q.traeger === traegerId && !q.abgeschlossen) || (state.ich === "AG" ? null : state.auftraege.find(q => q.traeger === traegerId))
+      : cur();
     if (!a) {
       const frei = traegerId || state.freieTraeger[0];
       if (state.ich === "AG" && frei) { neuesProjekt(frei); toast(`Träger ${frei} ist frei`); }
@@ -2067,7 +2557,15 @@ img.view3d { object-fit: contain; padding: 28px; }
     }
     state.aktuellerAuftrag = a.id;
     schliesseAlles();
-    if (state.ich === "LOG") { ui.logAuftrag = a.id; render(); toast(a.logistik ? `Ziel: ${ort(a, a.logistik.nach).name}` : "Kein Transport offen"); return; }
+    if (state.ich === "LOG") {
+      ui.logAuftrag = a.id;
+      let meldung = a.logistik ? `Ziel: ${ort(a, a.logistik.nach).name}` : "Kein Transport offen";
+      if (a.logistik && a.logistik.status === "angefragt") {
+        a.logistik.status = "abgeholt"; a.logistik.abgeholt = jetztIso();
+        meldung = `Abholung bestätigt · Ziel: ${ort(a, a.logistik.nach).name}`;
+      }
+      render(); toast(meldung); return;
+    }
     ui.ebene = "traeger"; ui.ansicht = null;
     let meldung = null;
     if (state.ich === "AG") {
@@ -2117,6 +2615,15 @@ img.view3d { object-fit: contain; padding: 28px; }
   function bauteileAus(p, stationen) {
     const fertig = p.modelle.filter(x => !x.laedt);
     if (!fertig.length) return layout(p.bauteile, stationen);
+    if (fertig.length > 1 && reiheMassstab(fertig, true) > reiheMassstab(fertig, false) * 1.05) {
+      fertig.forEach(x => {
+        const m = MODELLE.get(x.id);
+        if (!m) return;
+        const g = drehe90(m);
+        MODELLE.set(x.id, g);
+        Object.assign(x, { min: g.min, max: g.max, ext: g.ext, draufsicht: draufsicht(g, 256) });
+      });
+    }
     const lage = packe(fertig), alle = stationen.map((_, i) => i + 1);
     return fertig.map((x, i) => {
       IDB.legen(x.id, MODELLE.get(x.id));
@@ -2166,6 +2673,97 @@ img.view3d { object-fit: contain; padding: 28px; }
     render();
     grosseMeldung("Logistik benachrichtigt", `${LOGISTIK.name} holt den Träger bei Ihnen ab und bringt ihn zu Station 1, ${WERK[stationen[0].werkstatt].name}.`, `Projekt ${a.id} ist gestartet`);
   }
+
+  /* =====================================================================
+     Scanner: Kamera und QR-Leser. Wer scannt, entscheidet, was passiert.
+     ===================================================================== */
+  function scanErgebnis(text, zweck) {
+    const m = String(text || "").match(/PC-\d{4}/);
+    if (!m) { toast("Das ist kein Code eines Trägers"); return; }
+    const id = m[0];
+    if (zweck === "koppeln" && ui.projekt) {
+      const belegt = state.auftraege.find(a => a.traeger === id && !a.abgeschlossen);
+      if (belegt) { toast(`Träger ${id} gehört schon zu ${belegt.id}`); render(); return; }
+      ui.projekt.traeger = id;
+      render();
+      toast(`Träger ${id} gekoppelt`);
+      return;
+    }
+    scan(id);
+  }
+  const Scanner = (function () {
+    let strom = null, uhr = null, zweck = null, detektor = null, aktiv = false;
+    const leinwand = document.createElement("canvas");
+    const wer = () => (state.ich === "AG" ? `als Auftraggeber · ${AUFTRAGGEBER.name}` : state.ich === "LOG" ? `als Logistik · ${LOGISTIK.name}` : `als ${WERK[state.ich].name}`);
+    const fuss = html => { $("#scanFuss").innerHTML = html; };
+    function bildLesen(quelle, bw, bh) {
+      const f = Math.min(1, 800 / Math.max(bw, bh));
+      leinwand.width = Math.round(bw * f); leinwand.height = Math.round(bh * f);
+      const ctx = leinwand.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(quelle, 0, 0, leinwand.width, leinwand.height);
+      return window.QRLeser ? window.QRLeser.lesen(ctx.getImageData(0, 0, leinwand.width, leinwand.height)) : null;
+    }
+    function treffer(text) {
+      try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) { /* ohne Vibration */ }
+      const z = zweck;
+      schliessen();
+      scanErgebnis(text, z);
+    }
+    async function runde() {
+      if (!aktiv) return;
+      const v = $("#scanVideo");
+      let text = null;
+      if (v.readyState >= 2 && v.videoWidth) {
+        try {
+          if (detektor) { const r = await detektor.detect(v); if (r && r.length) text = r[0].rawValue; }
+          if (!text) text = bildLesen(v, v.videoWidth, v.videoHeight);
+        } catch (e) { text = null; }
+      }
+      if (text && /PC-\d{4}/.test(text)) { treffer(text); return; }
+      if (aktiv) uhr = setTimeout(runde, 150);
+    }
+    async function oeffnen(z) {
+      zweck = z; aktiv = true;
+      $("#scanTitel").textContent = z === "koppeln" ? "Träger koppeln" : "Code scannen";
+      $("#scanWer").textContent = wer();
+      fuss("");
+      $("#scanner").hidden = false;
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("keine Kamera");
+        strom = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+        if (!aktiv) { strom.getTracks().forEach(t => t.stop()); strom = null; return; }
+        const v = $("#scanVideo");
+        v.setAttribute("playsinline", ""); v.muted = true; v.srcObject = strom;
+        await v.play();
+        if (!detektor && "BarcodeDetector" in window) {
+          try { const f = await window.BarcodeDetector.getSupportedFormats(); if (f.includes("qr_code")) detektor = new window.BarcodeDetector({ formats: ["qr_code"] }); } catch (e) { detektor = null; }
+        }
+        runde();
+      } catch (e) {
+        fuss(`<p class="scan-text">Kamera nicht verfügbar</p><button class="btn umriss" type="button" data-act="scan-foto">Foto wählen</button>`);
+      }
+    }
+    function schliessen() {
+      aktiv = false;
+      clearTimeout(uhr);
+      if (strom) { strom.getTracks().forEach(t => t.stop()); strom = null; }
+      const v = $("#scanVideo");
+      v.pause(); v.srcObject = null;
+      $("#scanner").hidden = true;
+    }
+    function foto(datei) {
+      const url = URL.createObjectURL(datei), bild = new Image();
+      bild.onload = () => {
+        const text = bildLesen(bild, bild.naturalWidth, bild.naturalHeight);
+        URL.revokeObjectURL(url);
+        if (text && /PC-\d{4}/.test(text)) treffer(text);
+        else fuss(`<p class="scan-text">Kein Code erkannt</p><button class="btn umriss" type="button" data-act="scan-foto">Foto wählen</button>`);
+      };
+      bild.onerror = () => { URL.revokeObjectURL(url); fuss(`<p class="scan-text">Kein Code erkannt</p><button class="btn umriss" type="button" data-act="scan-foto">Foto wählen</button>`); };
+      bild.src = url;
+    }
+    return { oeffnen, schliessen, foto };
+  })();
 
   /* =====================================================================
      Klicks und Tasten
@@ -2242,6 +2840,9 @@ img.view3d { object-fit: contain; padding: 28px; }
         render(); toast(`Zugestellt an ${ort(q, q.logistik.nach).name}`); break;
       }
       case "demo-auf": document.body.classList.add("demo-offen"); break;
+      case "scan-oeffnen": Scanner.oeffnen("scan"); break;
+      case "scan-zu": Scanner.schliessen(); break;
+      case "scan-foto": $("#scanFoto").click(); break;
       /* Projekt anlegen */
       case "projekt-neu": neuesProjekt(null); break;
       case "p-zurueck": if (ui.projekt.schritt === 0) schliesseBlatt(); else { ui.projekt.schritt--; render(); } break;
@@ -2266,15 +2867,8 @@ img.view3d { object-fit: contain; padding: 28px; }
         render(); break;
       }
       case "p-dok-weg": ui.projekt.unterlagen.splice(+el.dataset.i, 1); render(); break;
-      case "p-scan":
-        ui.projekt.scannt = true; render();
-        setTimeout(() => { if (!ui.projekt) return; ui.projekt.scannt = false; ui.projekt.traeger = state.freieTraeger[0] || "PC-0099"; render(); toast(`Träger ${ui.projekt.traeger} gekoppelt`); }, 1200);
-        break;
-      case "p-scan-neu": {
-        const frei = state.freieTraeger.filter(x => x !== ui.projekt.traeger);
-        ui.projekt.traeger = null; if (frei.length) state.freieTraeger = frei.concat(state.freieTraeger.filter(x => !frei.includes(x)));
-        render(); break;
-      }
+      case "p-scan": Scanner.oeffnen("koppeln"); break;
+      case "p-scan-neu": ui.projekt.traeger = null; render(); Scanner.oeffnen("koppeln"); break;
     }
   });
 
@@ -2328,6 +2922,7 @@ img.view3d { object-fit: contain; padding: 28px; }
       ui.neu.foto = URL.createObjectURL(t.files[0]); ui.neu.striche = [];
       t.value = ""; render();
     }
+    if (t.id === "scanFoto" && t.files && t.files[0]) { const f = t.files[0]; t.value = ""; Scanner.foto(f); return; }
     if (t.id === "modellInput" && t.files && ui.projekt) {
       const dateien = Array.from(t.files);
       t.value = "";
@@ -2347,6 +2942,7 @@ img.view3d { object-fit: contain; padding: 28px; }
     if (e.target.matches("input, textarea, select")) { if (e.key === "Escape") e.target.blur(); return; }
     const a = cur();
     if (e.key === "Escape") {
+      if (!$("#scanner").hidden) { Scanner.schliessen(); return; }
       if (document.body.classList.contains("demo-offen")) { document.body.classList.remove("demo-offen"); return; }
       if (ui.kreismenue || ui.modus) { ui.kreismenue = null; ui.modus = null; render(); }
       else if (ui.blatt !== "zu") schliesseBlatt();
@@ -2723,7 +3319,7 @@ img.view3d { object-fit: contain; padding: 28px; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261121104346";
+  const BUILD = "20261121112034";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
