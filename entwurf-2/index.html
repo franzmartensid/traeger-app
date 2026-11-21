@@ -428,6 +428,21 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .geste.unter-well { margin: -4px 0 12px; }
 .dbtn:disabled { opacity: .4; cursor: default; }
 .tcard.neu { align-content: center; }
+
+/* ---------- 3D-Modelle ---------- */
+.bwell.b3d { position: relative; display: block; height: 300px; overflow: hidden; }
+.view3d { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+img.view3d { object-fit: contain; padding: 28px; }
+.pin.hinten { opacity: .3; pointer-events: none; }
+.rahmen { fill: none; }
+.modellzeile { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.modellzeile + .modellzeile { border-top: 1px solid var(--track); }
+.modellzeile .vorschau { width: 64px; height: 48px; border-radius: 10px; background: var(--well); display: grid; place-items: center; flex: 0 0 auto; overflow: hidden; }
+.modellzeile .vorschau img { max-width: 56px; max-height: 40px; }
+.modellzeile .rest { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.modellzeile input { border: 0; border-radius: 10px; background: var(--well); padding: 8px 10px; font: 800 16px/20px var(--font); color: var(--ink); min-height: 40px; width: 100%; }
+.modellreihe { display: flex; flex-wrap: wrap; gap: 8px; }
+.modellreihe img { height: 52px; max-width: 110px; background: var(--well); border-radius: 10px; padding: 6px; object-fit: contain; }
 </style>
 </head>
 <body>
@@ -451,6 +466,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 </div>
 <input id="fotoInput" type="file" accept="image/*" capture="environment" hidden>
 <input id="dateiInput" type="file" multiple hidden>
+<input id="modellInput" type="file" multiple hidden>
 <script>
 (function () {
   "use strict";
@@ -711,6 +727,10 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   function zwillingSvg(a, sel) {
     const teile = a.bauteile.map(b => {
       const y = b.y * .8, h = b.h * .8, s = sel === b.id;
+      if (b.form === "modell") {
+        const r = cls => `<rect class="${cls}" x="${b.x}" y="${y}" width="${b.w}" height="${h}" rx="2" ry="2"/>`;
+        return `<g data-bt="${b.id}">${s ? r("halo") : ""}<image href="${b.draufsicht}" x="${b.x}" y="${y}" width="${b.w}" height="${h}" preserveAspectRatio="none"/>${s ? r("part sel rahmen") : ""}</g>`;
+      }
       const form = cls => (b.form === "rund"
         ? `<ellipse class="${cls}" cx="${b.x + b.w / 2}" cy="${y + h / 2}" rx="${b.w / 2}" ry="${h / 2}"/>`
         : `<rect class="${cls}" x="${b.x}" y="${y}" width="${b.w}" height="${h}" rx="3.4" ry="3.4"/>`);
@@ -889,6 +909,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const groesse = b.w / (b.h * .8) >= 1.1 ? "width:82%" : "height:82%";
     const pins = a.anmerkungen.filter(x => x.bauteil === b.id)
       .map(x => pinHtml(a, x, { x: klemme(x.stelle.x * 100, 4, 96), y: klemme(x.stelle.y * 100, 5, 95) })).join("");
+    const pins3d = a.anmerkungen.filter(x => x.bauteil === b.id).map(x => pinHtml(a, x, { x: -100, y: -100 })).join("");
     const zeilen = b.verlauf.map(nr => {
       const chips = a.anmerkungen.filter(x => x.bauteil === b.id && x.von === nr).map(x => chip(x.art, "s")).join("");
       return `<button class="vrow" type="button" data-act="rueckblick" data-nr="${nr}">
@@ -900,7 +921,9 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const tags = a.unterlagen.map(u => `<span class="tag">${esc(u.name)} · Index ${esc(u.index)}</span>`).join("");
     return `<div class="head"><div class="kopf-l"><button class="textbtn" type="button" data-act="ebene" data-ebene="traeger" style="min-height:32px">‹ Träger ${a.id}</button>
         <h1 class="titel">${esc(b.name)}</h1></div></div>
-      <div class="bwell"><div class="bpart${b.form === "rund" ? " rund" : ""}" id="bpart" data-twin="bauteil" style="aspect-ratio:${verhaeltnis};${groesse}">${pins}</div></div>
+      ${b.form === "modell"
+        ? `<div class="bwell b3d" id="slot3d" data-twin="bauteil3d" data-bt="${b.id}" role="group" aria-label="3D-Modell ${esc(b.name)}">${pins3d}</div>`
+        : `<div class="bwell"><div class="bpart${b.form === "rund" ? " rund" : ""}" id="bpart" data-twin="bauteil" style="aspect-ratio:${verhaeltnis};${groesse}">${pins}</div></div>`}
       <section class="karte"><h2 class="ktitel">Verlauf dieses Bauteils</h2><div class="verlauf">${zeilen}</div></section>
       <section class="karte"><h2 class="ktitel">Unterlagen</h2><div class="tags">${tags || '<span class="leer">Keine Unterlagen</span>'}</div></section>
       <div class="platz"></div>`;
@@ -1123,27 +1146,38 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   }
 
   /* Änderung 6: Der Auftraggeber richtet ein Projekt ein */
-  const P_TITEL = ["Auftrag", "Werkstätten", "Unterlagen", "Träger koppeln", "Prüfen und starten"];
+  const P_TITEL = ["Auftrag", "Werkstätten", "Bauteile", "Unterlagen", "Träger koppeln", "Prüfen und starten"];
   function projektWeiterOk(p) {
     if (p.schritt === 0) return p.titel.trim().length > 0;
     if (p.schritt === 1) return p.stationen.length > 0;
-    if (p.schritt === 3) return !!p.traeger;
+    if (p.schritt === 2) return !p.modelle.some(x => x.laedt);
+    if (p.schritt === 4) return !!p.traeger;
     return true;
+  }
+  const bauteilZahl = p => (p.modelle.length ? p.modelle.length : p.bauteile);
+  function bauteilSchritt(p) {
+    const zeilen = p.modelle.map((x, k) => (x.laedt
+      ? `<div class="modellzeile"><span class="vorschau"></span><span class="rest"><span class="ktitel">${esc(x.name)}</span><span class="neben">wird gelesen …</span></span></div>`
+      : `<div class="modellzeile"><span class="vorschau"><img src="${x.draufsicht}" alt=""></span>
+          <span class="rest"><input data-pm="name" data-i="${k}" value="${esc(x.name)}" aria-label="Name des Bauteils" autocomplete="off"><span class="neben">${masse([x.ext[0], x.ext[2], x.ext[1]])} mm · ${x.dreiecke.toLocaleString("de-DE")} Dreiecke</span></span>
+          <button class="mini-btn" type="button" data-act="p-modell-weg" data-i="${k}" aria-label="${esc(x.name)} entfernen">×</button></div>`)).join("");
+    const ohne = p.modelle.length ? "" : `<section class="karte"><h2 class="ktitel">Bauteile ohne 3D-Modell</h2>
+        <div class="kglied"><button class="mini-btn" type="button" data-act="p-bauteile" data-d="-1" aria-label="Weniger Bauteile" ${p.bauteile <= 1 ? "disabled" : ""}>−</button>
+        <span class="titel num" style="min-width:40px;text-align:center">${p.bauteile}</span>
+        <button class="mini-btn" type="button" data-act="p-bauteile" data-d="1" aria-label="Mehr Bauteile" ${p.bauteile >= 4 ? "disabled" : ""}>+</button></div></section>`;
+    return `<button class="btn umriss block" type="button" data-act="p-modell" style="margin-bottom:12px">3D-Modelle wählen</button>
+      ${zeilen ? `<section class="karte">${zeilen}</section>` : ""}${ohne}`;
   }
   function blattProjekt() {
     const p = ui.projekt, i = p.schritt;
-    const kopf = `<div class="blatt-kopf"><p class="neben">Neues Projekt · ${i + 1} von 5</p><h2 class="btitel">${P_TITEL[i]}</h2>
+    const kopf = `<div class="blatt-kopf"><p class="neben">Neues Projekt · ${i + 1} von ${P_TITEL.length}</p><h2 class="btitel">${P_TITEL[i]}</h2>
       <div class="punkte" aria-hidden="true">${P_TITEL.map((_, k) => `<i class="${k <= i ? "an" : ""}"></i>`).join("")}</div></div>`;
     let body = "";
     if (i === 0) {
       body = `<label class="feld"><span class="beschr">Bezeichnung</span><input data-p="titel" type="text" value="${esc(p.titel)}" autocomplete="off"></label>
         <div class="tasten"><label class="feld"><span class="beschr">Stückzahl</span><input data-p="stueckzahl" type="number" min="1" inputmode="numeric" value="${p.stueckzahl}"></label>
         <label class="feld"><span class="beschr">Termin</span><input data-p="termin" type="date" value="${esc(p.termin)}"></label></div>
-        <label class="feld"><span class="beschr">Hinweise für alle Stationen</span><textarea data-p="hinweise" rows="2">${esc(p.hinweise)}</textarea></label>
-        <section class="karte"><div class="karte-top"><div><h2 class="ktitel">Bauteile im Träger</h2></div></div>
-          <div class="kglied"><button class="mini-btn" type="button" data-act="p-bauteile" data-d="-1" aria-label="Weniger Bauteile" ${p.bauteile <= 1 ? "disabled" : ""}>−</button>
-          <span class="titel num" style="min-width:40px;text-align:center">${p.bauteile}</span>
-          <button class="mini-btn" type="button" data-act="p-bauteile" data-d="1" aria-label="Mehr Bauteile" ${p.bauteile >= 4 ? "disabled" : ""}>+</button></div></section>`;
+        <label class="feld"><span class="beschr">Hinweise für alle Stationen</span><textarea data-p="hinweise" rows="2">${esc(p.hinweise)}</textarea></label>`;
     } else if (i === 1) {
       const glieder = p.stationen.map((s, k) => {
         const w = WERK[s.w];
@@ -1159,6 +1193,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         <div class="kglied"><span class="knoten a">A</span><span class="rest"><span class="ktitel">Rückkehr</span></span></div></div>
         <button class="btn umriss block" type="button" data-act="p-waehlen" aria-expanded="${!!p.waehlen}" style="margin-bottom:12px">${p.waehlen ? "Liste schließen" : "+ Werkstatt hinzufügen"}</button>${wahl}`;
     } else if (i === 2) {
+      body = bauteilSchritt(p);
+    } else if (i === 3) {
       const optStation = sel => `<option value="">Alle Stationen</option>` + p.stationen.map((s, k) => `<option value="${s.key}" ${sel === s.key ? "selected" : ""}>Station ${k + 1} · ${esc(WERK[s.w].name)}</option>`).join("");
       const arten = ["Zeichnung", "3D-Modell", "Prüfplan", "Sonstiges"];
       const zeilen = p.unterlagen.map((u, k) => `<div class="dokzeile"><div class="reihe"><span class="name">${esc(u.name)}</span>
@@ -1168,7 +1204,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
           <select data-pd="station" data-i="${k}" aria-label="Für welche Station">${optStation(u.station)}</select></div>`).join("");
       body = `<button class="btn umriss block" type="button" data-act="p-datei" style="margin-bottom:12px">Datei wählen</button>
         <section class="karte">${zeilen || '<p class="leer">Noch keine Unterlagen.</p>'}</section>`;
-    } else if (i === 3) {
+    } else if (i === 4) {
       if (p.traeger) {
         body = `<div class="status fertig"><span class="ico">${ICO.haken}</span><div><p class="t">Träger ${p.traeger} gekoppelt</p><p class="u">Auftrag und Träger gehören jetzt zusammen.</p></div></div>
           <button class="textbtn" type="button" data-act="p-scan-neu">Anderen Träger scannen</button>`;
@@ -1181,15 +1217,376 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         ${p.stationen.map((s, k) => `<div class="kglied"><span class="knoten">${k + 1}</span><span class="rest"><span class="text">${esc(WERK[s.w].name)}</span><span class="neben">${esc(WERK[s.w].verfahren)}</span></span></div>`).join("")}
         <div class="kglied"><span class="knoten a">A</span><span class="rest text">Rückkehr</span></div></div>`;
       const tags = p.unterlagen.map(u => `<span class="tag">${esc(u.art)} · Index ${esc(u.index)}</span>`).join("");
-      body = `<section class="karte"><p class="beschr">Auftrag</p><h2 class="ktitel">${esc(p.titel)}</h2><p class="neben">${p.stueckzahl} Stück · Termin ${fmtDatum(p.termin)} · ${p.bauteile} Bauteil${p.bauteile > 1 ? "e" : ""}</p></section>
+      body = `<section class="karte"><p class="beschr">Auftrag</p><h2 class="ktitel">${esc(p.titel)}</h2><p class="neben">${p.stueckzahl} Stück · Termin ${fmtDatum(p.termin)} · ${bauteilZahl(p)} Bauteil${bauteilZahl(p) > 1 ? "e" : ""}</p></section>
+        ${p.modelle.length ? `<section class="karte"><p class="beschr">Bauteile</p><div class="modellreihe">${p.modelle.map(x => `<img src="${x.draufsicht}" alt="${esc(x.name)}">`).join("")}</div></section>` : ""}
         <section class="karte"><p class="beschr">Weg des Trägers</p>${weg}</section>
         <section class="karte"><p class="beschr">Unterlagen</p><div class="tags">${tags || '<span class="leer">Keine</span>'}</div></section>
         <section class="karte"><p class="beschr">Träger</p><h2 class="ktitel">${p.traeger}</h2></section>`;
     }
     body += `<div class="fusszeile"><div class="tasten"><button class="btn umriss" type="button" data-act="p-zurueck">${i === 0 ? "Abbrechen" : "Zurück"}</button>
-      <button class="btn pri" type="button" data-act="p-weiter" id="pWeiter" ${projektWeiterOk(p) ? "" : "disabled"}>${i === 4 ? "Projekt starten" : "Weiter"}</button></div></div>`;
+      <button class="btn pri" type="button" data-act="p-weiter" id="pWeiter" ${projektWeiterOk(p) ? "" : "disabled"}>${i === P_TITEL.length - 1 ? "Projekt starten" : "Weiter"}</button></div></div>`;
     return { kopf, body };
   }
+
+  /* =====================================================================
+     3D-Modelle: lesen (STL, OBJ), Draufsicht, Anordnung im Träger, Speicher
+     ===================================================================== */
+  const MODELLE = new Map();
+  const IDB = {
+    db: null,
+    oeffnen() {
+      if (IDB.db) return Promise.resolve(IDB.db);
+      return new Promise(res => {
+        try {
+          const r = indexedDB.open("traeger-entwurf-2", 1);
+          r.onupgradeneeded = () => r.result.createObjectStore("modelle");
+          r.onsuccess = () => { IDB.db = r.result; res(IDB.db); };
+          r.onerror = () => res(null);
+        } catch (e) { res(null); }
+      });
+    },
+    async legen(id, m) {
+      const db = await IDB.oeffnen();
+      if (!db || !m) return;
+      try { db.transaction("modelle", "readwrite").objectStore("modelle").put({ pos: m.pos, nor: m.nor, min: m.min, max: m.max, ext: m.ext }, id); } catch (e) { /* ohne Speicher */ }
+    },
+    async holen(id) {
+      const db = await IDB.oeffnen();
+      if (!db) return null;
+      return new Promise(res => {
+        try { const r = db.transaction("modelle").objectStore("modelle").get(id); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null); } catch (e) { res(null); }
+      });
+    },
+    async leeren() {
+      const db = await IDB.oeffnen();
+      if (!db) return;
+      try { db.transaction("modelle", "readwrite").objectStore("modelle").clear(); } catch (e) { /* leer */ }
+    }
+  };
+  async function modellHolen(id) {
+    if (MODELLE.has(id)) return MODELLE.get(id);
+    const m = await IDB.holen(id);
+    if (m) MODELLE.set(id, m);
+    return m;
+  }
+
+  function leseStl(buf) {
+    const dv = new DataView(buf);
+    const n = buf.byteLength >= 84 ? dv.getUint32(80, true) : 0;
+    if (n > 0 && buf.byteLength === 84 + n * 50) {
+      const pos = new Float32Array(n * 9);
+      for (let i = 0; i < n; i++) {
+        const o = 84 + i * 50 + 12;
+        for (let k = 0; k < 9; k++) pos[i * 9 + k] = dv.getFloat32(o + k * 4, true);
+      }
+      return pos;
+    }
+    return leseStlText(buf);
+  }
+  function leseStlText(buf) {
+    const zahlen = [];
+    const re = /vertex\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)/g;
+    const text = new TextDecoder().decode(buf);
+    let m;
+    while ((m = re.exec(text))) zahlen.push(+m[1], +m[2], +m[3]);
+    return Float32Array.from(zahlen.slice(0, zahlen.length - (zahlen.length % 9)));
+  }
+  function leseObj(text) {
+    const v = [], aus = [];
+    text.split(/\r?\n/).forEach(z => {
+      const t = z.trim().split(/\s+/);
+      if (t[0] === "v") v.push(+t[1], +t[2], +t[3]);
+      else if (t[0] === "f") {
+        const idx = t.slice(1).map(s => { const i = parseInt(s.split("/")[0], 10); return i < 0 ? v.length / 3 + i : i - 1; });
+        for (let k = 1; k + 1 < idx.length; k++) [idx[0], idx[k], idx[k + 1]].forEach(j => aus.push(v[j * 3], v[j * 3 + 1], v[j * 3 + 2]));
+      }
+    });
+    return new Float32Array(aus);
+  }
+  function grenzen(pos) {
+    const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { const w = pos[i + k]; if (w < min[k]) min[k] = w; if (w > max[k]) max[k] = w; }
+    return { min, max, ext: [max[0] - min[0], max[1] - min[1], max[2] - min[2]] };
+  }
+  /* Das Bauteil liegt auf seiner größten Fläche: kleinste Ausdehnung zeigt nach oben (y),
+     die längste Seite liegt quer (x). Ergebnis ist um den Mittelpunkt zentriert. */
+  function bereiteModell(roh) {
+    if (!roh || roh.length < 9 || roh.some(w => !isFinite(w))) throw new Error("In der Datei sind keine Flächen.");
+    const g0 = grenzen(roh);
+    const mitte = [0, 1, 2].map(k => (g0.min[k] + g0.max[k]) / 2);
+    const ach = [0, 1, 2].sort((i, j) => g0.ext[i] - g0.ext[j]);
+    const oben = ach[0], quer = ach[2], tief = ach[1];
+    const B = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    B[0][quer] = 1; B[1][oben] = 1; B[2][tief] = 1;
+    const det = B[0][0] * (B[1][1] * B[2][2] - B[1][2] * B[2][1]) - B[0][1] * (B[1][0] * B[2][2] - B[1][2] * B[2][0]) + B[0][2] * (B[1][0] * B[2][1] - B[1][1] * B[2][0]);
+    if (det < 0) B[2][tief] = -1;
+    const pos = new Float32Array(roh.length);
+    for (let i = 0; i < roh.length; i += 3) {
+      const x = roh[i] - mitte[0], y = roh[i + 1] - mitte[1], z = roh[i + 2] - mitte[2];
+      for (let r = 0; r < 3; r++) pos[i + r] = B[r][0] * x + B[r][1] * y + B[r][2] * z;
+    }
+    const nor = new Float32Array(pos.length);
+    for (let i = 0; i < pos.length; i += 9) {
+      const ux = pos[i + 3] - pos[i], uy = pos[i + 4] - pos[i + 1], uz = pos[i + 5] - pos[i + 2];
+      const vx = pos[i + 6] - pos[i], vy = pos[i + 7] - pos[i + 1], vz = pos[i + 8] - pos[i + 2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const l = Math.hypot(nx, ny, nz) || 1;
+      nx /= l; ny /= l; nz /= l;
+      for (let k = 0; k < 9; k += 3) { nor[i + k] = nx; nor[i + k + 1] = ny; nor[i + k + 2] = nz; }
+    }
+    const g = grenzen(pos);
+    return { pos, nor, min: g.min, max: g.max, ext: g.ext };
+  }
+  function tokenFarbe(name) {
+    const h = getComputedStyle(document.documentElement).getPropertyValue(name).trim().replace("#", "");
+    return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+  }
+  /* Draufsicht als Bild wie die übrigen Bauteile: weiße Fläche mit Rand in --line.
+     Tiefer liegende Flächen etwas dunkler (zwischen --grey und --card), damit Stufen sichtbar sind. */
+  function draufsicht(m, maxPx) {
+    const rand = 3;
+    const s = (maxPx - 2 * rand) / Math.max(m.ext[0], m.ext[2], 1e-9);
+    const W = Math.max(2, Math.ceil(m.ext[0] * s)) + 2 * rand, H = Math.max(2, Math.ceil(m.ext[2] * s)) + 2 * rand;
+    const bild = document.createElement("canvas");
+    bild.width = W; bild.height = H;
+    const ctx = bild.getContext("2d");
+    const hell = tokenFarbe("--card"), dunkel = tokenFarbe("--grey");
+    const n = m.pos.length / 9;
+    const reihe = new Uint32Array(n), hoehe = new Float32Array(n);
+    for (let i = 0; i < n; i++) { reihe[i] = i; hoehe[i] = (m.pos[i * 9 + 1] + m.pos[i * 9 + 4] + m.pos[i * 9 + 7]) / 3; }
+    reihe.sort((p, q) => hoehe[p] - hoehe[q]);
+    const L = [0.35, 0.8, 0.45], lL = Math.hypot(L[0], L[1], L[2]);
+    ctx.lineWidth = 0.8; ctx.lineJoin = "round";
+    for (let k = 0; k < n; k++) {
+      const i = reihe[k] * 9;
+      let nx = m.nor[i], ny = m.nor[i + 1], nz = m.nor[i + 2];
+      if (Math.abs(ny) < 0.02) continue;
+      if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
+      const licht = Math.max(0, (nx * L[0] + ny * L[1] + nz * L[2]) / lL);
+      const h = m.ext[1] > 0 ? (hoehe[reihe[k]] - m.min[1]) / m.ext[1] : 1;
+      const l = Math.round((0.62 + 0.38 * (0.4 * licht + 0.6 * h)) * 24) / 24;
+      const f = `rgb(${[0, 1, 2].map(j => Math.round((dunkel[j] + (hell[j] - dunkel[j]) * l) * 255)).join(",")})`;
+      ctx.fillStyle = f; ctx.strokeStyle = f;
+      ctx.beginPath();
+      for (let v = 0; v < 3; v++) {
+        const px = rand + (m.pos[i + v * 3] - m.min[0]) * s, py = rand + (m.pos[i + v * 3 + 2] - m.min[2]) * s;
+        if (v) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    /* Rand: Umriss um 1,5 px aufweiten und in --line einfärben, dann die Fläche darüber */
+    const umriss = document.createElement("canvas");
+    umriss.width = W; umriss.height = H;
+    const u = umriss.getContext("2d");
+    const d = 1.5;
+    [[-d, 0], [d, 0], [0, -d], [0, d], [-d, -d], [d, d], [-d, d], [d, -d]].forEach(([dx, dy]) => u.drawImage(bild, dx, dy));
+    u.globalCompositeOperation = "source-in";
+    u.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--line").trim();
+    u.fillRect(0, 0, W, H);
+    u.globalCompositeOperation = "source-over";
+    u.drawImage(bild, 0, 0);
+    return umriss.toDataURL("image/png");
+  }
+  /* Anordnung im Träger: maßstabsgleich, in Reihen, so groß wie möglich (Trägerfläche 100 × 80) */
+  function packe(liste) {
+    const W = 100, H = 80, M = 7, G = 5;
+    const teile = liste.map((m, i) => ({ i, w: Math.max(m.ext[0], 1e-6), d: Math.max(m.ext[2], 1e-6) })).sort((p, q) => q.d - p.d);
+    const versuch = s => {
+      let x = M, y = M, zeile = 0;
+      const lage = [];
+      for (const t of teile) {
+        const w = t.w * s, d = t.d * s;
+        if (w > W - 2 * M + 1e-9) return null;
+        if (x + w > W - M + 1e-9) { x = M; y += zeile + G; zeile = 0; }
+        lage[t.i] = { x, y, w, d };
+        x += w + G; zeile = Math.max(zeile, d);
+      }
+      return y + zeile <= H - M + 1e-9 ? lage : null;
+    };
+    let lo = 0, hi = Math.min.apply(null, teile.map(t => Math.min((W - 2 * M) / t.w, (H - 2 * M) / t.d)));
+    if (!versuch(hi)) { for (let k = 0; k < 40; k++) { const mid = (lo + hi) / 2; if (versuch(mid)) lo = mid; else hi = mid; } hi = lo; }
+    const lage = versuch(hi) || teile.map(() => ({ x: M, y: M, w: 10, d: 10 }));
+    const x1 = Math.max.apply(null, lage.map(l => l.x + l.w)), y1 = Math.max.apply(null, lage.map(l => l.y + l.d));
+    const dx = (W - x1 - M) / 2, dy = (H - y1 - M) / 2;
+    return lage.map(l => ({ x: l.x + dx, y: (l.y + dy) / H * 100, w: l.w, h: l.d / H * 100 }));
+  }
+  async function leseModellDatei(f) {
+    const endung = ((f.name.match(/\.([^.]+)$/) || [])[1] || "").toLowerCase();
+    if (endung !== "stl" && endung !== "obj") throw new Error(`${f.name}: Dieses Format kann die App nicht lesen. Möglich sind STL und OBJ.`);
+    const buf = await f.arrayBuffer();
+    let roh = endung === "stl" ? leseStl(buf) : leseObj(new TextDecoder().decode(buf));
+    if (endung === "stl" && !roh.length) roh = leseStlText(buf);
+    const m = bereiteModell(roh);
+    const id = "M" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    MODELLE.set(id, m);
+    return { id, name: f.name.replace(/\.[^.]+$/, ""), datei: f.name, min: m.min, max: m.max, ext: m.ext, dreiecke: m.pos.length / 9, draufsicht: draufsicht(m, 256) };
+  }
+  const masse = ext => ext.map(v => (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10).toLocaleString("de-DE")).join(" × ");
+
+  /* =====================================================================
+     3D-Ansicht: WebGL ohne Bibliothek, mit einem Finger drehen
+     ===================================================================== */
+  const Ansicht = (function () {
+    let cv = null, gl = null, prog = null, loc = null, pPuf = null, nPuf = null;
+    let slot = null, modellId = null, m = null, anzahlEcken = 0, yaw = -0.55, pitch = 0.5, kein = false;
+    const FOV = 30 * Math.PI / 180;
+    const VS = "attribute vec3 p;attribute vec3 n;uniform mat4 mvp;uniform mat3 rot;varying vec3 vn;void main(){vn=rot*n;gl_Position=mvp*vec4(p,1.0);}";
+    const FS = "precision mediump float;varying vec3 vn;uniform vec3 hell;uniform vec3 dunkel;void main(){vec3 n=normalize(vn);if(!gl_FrontFacing)n=-n;"
+      + "float l=0.2+0.62*max(dot(n,normalize(vec3(0.35,0.75,0.6))),0.0)+0.18*max(dot(n,normalize(vec3(-0.6,0.1,0.3))),0.0);"
+      + "gl_FragColor=vec4(mix(dunkel,hell,clamp(l,0.0,1.0)),1.0);}";
+    function start() {
+      if (gl || kein) return !!gl;
+      cv = document.createElement("canvas");
+      cv.className = "view3d";
+      gl = cv.getContext("webgl", { antialias: true, alpha: true, premultipliedAlpha: false });
+      if (!gl) { kein = true; return false; }
+      const sh = (typ, src) => { const s = gl.createShader(typ); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+      prog = gl.createProgram();
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { kein = true; gl = null; return false; }
+      loc = { p: gl.getAttribLocation(prog, "p"), n: gl.getAttribLocation(prog, "n"), mvp: gl.getUniformLocation(prog, "mvp"),
+        rot: gl.getUniformLocation(prog, "rot"), hell: gl.getUniformLocation(prog, "hell"), dunkel: gl.getUniformLocation(prog, "dunkel") };
+      pPuf = gl.createBuffer(); nPuf = gl.createBuffer();
+      return true;
+    }
+    function hochladen(daten) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, pPuf); gl.bufferData(gl.ARRAY_BUFFER, daten.pos, gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, nPuf); gl.bufferData(gl.ARRAY_BUFFER, daten.nor, gl.STATIC_DRAW);
+      anzahlEcken = daten.pos.length / 3;
+    }
+    function drehung() {
+      const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+      return [[cy, 0, sy], [sp * sy, cp, -sp * cy], [-cp * sy, sp, cp * cy]];
+    }
+    function kamera() {
+      const r = slot.getBoundingClientRect();
+      const W = Math.max(1, r.width), H = Math.max(1, r.height), asp = W / H;
+      const Rk = 0.5 * Math.hypot(m.ext[0], m.ext[1], m.ext[2]) || 1;
+      const hfov = 2 * Math.atan(Math.tan(FOV / 2) * asp);
+      const D = Rk / Math.sin(Math.min(FOV, hfov) / 2) * 1.12;
+      const t = 1 / Math.tan(FOV / 2);
+      return { r, W, H, asp, D, t, Rk, R: drehung() };
+    }
+    function zeichne() {
+      if (!gl || !m || !slot || !document.contains(slot)) return;
+      const k = kamera();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const bw = Math.round(k.W * dpr), bh = Math.round(k.H * dpr);
+      if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
+      gl.viewport(0, 0, bw, bh);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST);
+      gl.useProgram(prog);
+      const n = Math.max(0.01, k.D - k.Rk * 1.5), f = k.D + k.Rk * 1.5, R = k.R;
+      const P = [k.t / k.asp, 0, 0, 0, 0, k.t, 0, 0, 0, 0, (f + n) / (n - f), -1, 0, 0, 2 * f * n / (n - f), 0];
+      /* M·V: Drehung, dann um D vor die Kamera; spaltenweise */
+      const MV = [R[0][0], R[1][0], R[2][0], 0, R[0][1], R[1][1], R[2][1], 0, R[0][2], R[1][2], R[2][2], 0, 0, 0, -k.D, 1];
+      const mvp = new Float32Array(16);
+      for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let q = 0; q < 4; q++) s += P[q * 4 + r] * MV[c * 4 + q]; mvp[c * 4 + r] = s; }
+      gl.uniformMatrix4fv(loc.mvp, false, mvp);
+      gl.uniformMatrix3fv(loc.rot, false, new Float32Array([R[0][0], R[1][0], R[2][0], R[0][1], R[1][1], R[2][1], R[0][2], R[1][2], R[2][2]]));
+      gl.uniform3fv(loc.hell, tokenFarbe("--card")); gl.uniform3fv(loc.dunkel, tokenFarbe("--grey"));
+      gl.bindBuffer(gl.ARRAY_BUFFER, pPuf); gl.enableVertexAttribArray(loc.p); gl.vertexAttribPointer(loc.p, 3, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, nPuf); gl.enableVertexAttribArray(loc.n); gl.vertexAttribPointer(loc.n, 3, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, anzahlEcken);
+      setzePins(k);
+    }
+    function projiziereK(k, p) {
+      const R = k.R;
+      const vx = R[0][0] * p[0] + R[0][1] * p[1] + R[0][2] * p[2];
+      const vy = R[1][0] * p[0] + R[1][1] * p[1] + R[1][2] * p[2];
+      const vz = R[2][0] * p[0] + R[2][1] * p[1] + R[2][2] * p[2] - k.D;
+      return { x: (k.t / k.asp * vx / -vz + 1) / 2 * k.W, y: (1 - k.t * vy / -vz) / 2 * k.H, v: [vx, vy, vz] };
+    }
+    function strahl(o, d) {
+      let best = Infinity, bi = -1;
+      const P = m.pos;
+      for (let i = 0; i < P.length; i += 9) {
+        const e1x = P[i + 3] - P[i], e1y = P[i + 4] - P[i + 1], e1z = P[i + 5] - P[i + 2];
+        const e2x = P[i + 6] - P[i], e2y = P[i + 7] - P[i + 1], e2z = P[i + 8] - P[i + 2];
+        const px = d[1] * e2z - d[2] * e2y, py = d[2] * e2x - d[0] * e2z, pz = d[0] * e2y - d[1] * e2x;
+        const det = e1x * px + e1y * py + e1z * pz;
+        if (Math.abs(det) < 1e-12) continue;
+        const inv = 1 / det, tx = o[0] - P[i], ty = o[1] - P[i + 1], tz = o[2] - P[i + 2];
+        const u = (tx * px + ty * py + tz * pz) * inv;
+        if (u < 0 || u > 1) continue;
+        const qx = ty * e1z - tz * e1y, qy = tz * e1x - tx * e1z, qz = tx * e1y - ty * e1x;
+        const v = (d[0] * qx + d[1] * qy + d[2] * qz) * inv;
+        if (v < 0 || u + v > 1) continue;
+        const t = (e2x * qx + e2y * qy + e2z * qz) * inv;
+        if (t > 1e-9 && t < best) { best = t; bi = i; }
+      }
+      if (bi < 0) return null;
+      return { punkt: [o[0] + d[0] * best, o[1] + d[1] * best, o[2] + d[2] * best], normal: [m.nor[bi], m.nor[bi + 1], m.nor[bi + 2]] };
+    }
+    function stelleVon(p) {
+      return { x: klemme((p[0] - m.min[0]) / (m.ext[0] || 1), 0, 1), y: klemme((p[2] - m.min[2]) / (m.ext[2] || 1), 0, 1) };
+    }
+    /* Anmerkungen, die auf dem Träger gesetzt wurden, bekommen ihren Punkt von oben auf der Oberfläche */
+    function punktVon(x) {
+      if (x.punkt) return x;
+      const px = m.min[0] + x.stelle.x * m.ext[0], pz = m.min[2] + x.stelle.y * m.ext[2];
+      const h = strahl([px, m.max[1] + 1, pz], [0, -1, 0]);
+      x.punkt = h ? h.punkt : [px, m.max[1], pz];
+      x.normal = h ? h.normal : [0, 1, 0];
+      return x;
+    }
+    function setzePins(k) {
+      const a = cur();
+      $$(".pin[data-id]", slot).forEach(el => {
+        const x = a && findAnm(a, el.dataset.id);
+        if (!x) return;
+        punktVon(x);
+        const q = projiziereK(k, x.punkt);
+        const R = k.R, n = x.normal;
+        const nv = [R[0][0] * n[0] + R[0][1] * n[1] + R[0][2] * n[2], R[1][0] * n[0] + R[1][1] * n[1] + R[1][2] * n[2], R[2][0] * n[0] + R[2][1] * n[1] + R[2][2] * n[2]];
+        const vorn = nv[0] * -q.v[0] + nv[1] * -q.v[1] + nv[2] * -q.v[2] > 0;
+        el.style.left = q.x + "px"; el.style.top = q.y + "px";
+        el.classList.toggle("hinten", !vorn);
+      });
+    }
+    return {
+      anbinden(s, a) {
+        slot = s;
+        const b = a.bauteile.find(q => q.id === s.dataset.bt);
+        if (!b || !start()) {
+          if (b) s.insertAdjacentHTML("afterbegin", `<img class="view3d" src="${b.draufsicht}" alt="${esc(b.name)}">`);
+          return;
+        }
+        s.insertBefore(cv, s.firstChild);
+        if (modellId !== b.modell) {
+          modellId = b.modell; m = null; yaw = -0.55; pitch = 0.5;
+          modellHolen(b.modell).then(d => {
+            if (modellId !== b.modell) return;
+            if (!d) { s.insertAdjacentHTML("afterbegin", `<img class="view3d" src="${b.draufsicht}" alt="${esc(b.name)}">`); return; }
+            m = d; hochladen(d); zeichne(); if (ui.kreismenue) renderKreis(cur());
+          });
+        } else zeichne();
+      },
+      loesen() { slot = null; },
+      aktiv: () => !!(slot && m && document.contains(slot)),
+      drehen(dx, dy) { yaw += dx * 0.01; pitch = klemme(pitch + dy * 0.01, -1.45, 1.45); zeichne(); },
+      treffer(cx, cy) {
+        if (!this.aktiv()) return null;
+        const k = kamera();
+        const nx = (cx - k.r.left) / k.W * 2 - 1, ny = 1 - (cy - k.r.top) / k.H * 2;
+        let d = [nx * k.asp / k.t, ny / k.t, -1];
+        const l = Math.hypot(d[0], d[1], d[2]); d = d.map(v => v / l);
+        const R = k.R;
+        const o = [R[2][0] * k.D, R[2][1] * k.D, R[2][2] * k.D];
+        const dm = [0, 1, 2].map(c => d[0] * R[0][c] + d[1] * R[1][c] + d[2] * R[2][c]);
+        const h = strahl(o, dm);
+        return h ? { punkt: h.punkt, normal: h.normal, stelle: stelleVon(h.punkt) } : null;
+      },
+      projiziere(p) {
+        if (!this.aktiv()) return null;
+        const k = kamera(), q = projiziereK(k, p);
+        return { x: k.r.left + q.x, y: k.r.top + q.y };
+      }
+    };
+  })();
 
   /* =====================================================================
      Zeichnen
@@ -1227,6 +1624,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         ${wird ? `<span class="pill st-geplant offline">${wird} Anmerkung${wird > 1 ? "en" : ""} wird gesendet</span>` : ""}</div>
       <div class="flaeche" id="flaeche">${html}</div>`;
     $("#flaeche").scrollTop = altScroll;
+    const slot3d = $("#slot3d");
+    if (slot3d) Ansicht.anbinden(slot3d, a); else Ansicht.loesen();
     letzteEbene = schluessel;
   }
 
@@ -1277,6 +1676,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   }
 
   function stellePunkt(a, km, zr) {
+    if (ui.ebene === "bauteil" && km.punkt && Ansicht.aktiv()) { const q = Ansicht.projiziere(km.punkt); if (q) return q; }
     if (ui.ebene === "bauteil") return { x: zr.left + km.stelle.x * zr.width, y: zr.top + km.stelle.y * zr.height };
     const p = km.bauteil ? pinPos(a, { bauteil: km.bauteil, stelle: km.stelle }) : { x: km.stelle.x * 100, y: km.stelle.y * 100 };
     return { x: zr.left + p.x / 100 * zr.width, y: zr.top + p.y / 100 * zr.height };
@@ -1285,7 +1685,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   function renderKreis(a) {
     const k = $("#kreis");
     if (!ui.kreismenue) { k.hidden = true; k.innerHTML = ""; return; }
-    const ziel = ui.ebene === "bauteil" ? $("#bpart") : $("#twin");
+    const ziel = ui.ebene === "bauteil" ? ($("#bpart") || $("#slot3d")) : $("#twin");
     if (!ziel) { ui.kreismenue = null; k.hidden = true; return; }
     const pr = phone.getBoundingClientRect(), zr = ziel.getBoundingClientRect();
     const km = ui.kreismenue;
@@ -1506,10 +1906,10 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     const von = g ? g.getBoundingClientRect() : null;
     ui.bauteil = bid; ui.ebene = "bauteil"; schliesseAlles();
     render();
-    flip(von, $("#bpart"), "g-part" + (b.form === "rund" ? " rund" : ""));
+    flip(von, $("#bpart") || $("#slot3d"), b.form === "modell" ? "g-twin" : "g-part" + (b.form === "rund" ? " rund" : ""));
   }
   function zurTraeger() {
-    const bp = $("#bpart");
+    const bp = $("#bpart") || $("#slot3d");
     const von = bp ? bp.getBoundingClientRect() : null;
     const bid = ui.bauteil;
     const b = cur().bauteile.find(q => q.id === bid);
@@ -1552,6 +1952,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   }
   function stelleAus(x, y) {
     if (ui.ebene === "bauteil") {
+      if ($("#slot3d")) { const h = Ansicht.treffer(x, y); return h ? { bauteil: ui.bauteil, stelle: h.stelle, punkt: h.punkt, normal: h.normal } : null; }
       const bp = $("#bpart");
       if (!bp) return null;
       const r = bp.getBoundingClientRect();
@@ -1572,7 +1973,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   function oeffneKreis(x, y, ziehen) {
     const s = stelleAus(x, y);
     if (!s) return;
-    ui.kreismenue = { bauteil: s.bauteil, stelle: s.stelle, ziehen };
+    ui.kreismenue = { bauteil: s.bauteil, stelle: s.stelle, punkt: s.punkt || null, normal: s.normal || null, ziehen };
     ui.modus = null;
     render();
   }
@@ -1602,7 +2003,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     if (!km) return;
     const alt = ui.neu && ui.neu.bauteil === km.bauteil && ui.neu.stelle === km.stelle ? ui.neu : null;
     ui.neu = Object.assign(alt || { foto: null, striche: [], memo: false, dauer: 0, audio: null, abschrift: "", satz: "" },
-      { art, bauteil: km.bauteil, stelle: km.stelle, bezug: vorschlag(a, art, km.bauteil, me), gewaehlt: false, aendern: false });
+      { art, bauteil: km.bauteil, stelle: km.stelle, punkt: km.punkt || null, normal: km.normal || null, bezug: vorschlag(a, art, km.bauteil, me), gewaehlt: false, aendern: false });
     ui.kreismenue = null; ui.blatt = "neu"; ui.blattHoehe = "voll";
     render();
   }
@@ -1610,7 +2011,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   function senden() {
     const a = cur(), d = ui.neu, me = meinNr(a);
     const x = anm({
-      id: "N" + Date.now().toString(36), art: d.art, von: me, bezug: d.bezug, bauteil: d.bauteil, stelle: d.stelle,
+      id: "N" + Date.now().toString(36), art: d.art, von: me, bezug: d.bezug, bauteil: d.bauteil, stelle: d.stelle, punkt: d.punkt || null, normal: d.normal || null,
       foto: d.foto ? fotoMitMarkierung() : null, audio: d.audio, dauer: d.dauer, abschrift: d.abschrift.trim(),
       heisstFuer: d.bezug === me ? "" : d.satz.trim(), zeit: jetztIso(), gelesenVon: [state.ich], offen: d.art === "frage", wirdGesendet: !navigator.onLine
     });
@@ -1689,7 +2090,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   function neuesProjekt(traeger) {
     schliesseAlles();
     ui.ebene = "alle";
-    ui.projekt = { schritt: 0, titel: "", stueckzahl: 1, termin: "", hinweise: "", bauteile: 3, stationen: [], waehlen: true, unterlagen: [], traeger: traeger || null, scannt: false, n: 0 };
+    ui.projekt = { schritt: 0, titel: "", stueckzahl: 1, termin: "", hinweise: "", bauteile: 3, stationen: [], waehlen: true, unterlagen: [], modelle: [], traeger: traeger || null, scannt: false, n: 0 };
     ui.blatt = "projekt"; ui.blattHoehe = "voll";
     render();
   }
@@ -1713,6 +2114,34 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     setTimeout(zeigeEingang, 300);
   }
 
+  function bauteileAus(p, stationen) {
+    const fertig = p.modelle.filter(x => !x.laedt);
+    if (!fertig.length) return layout(p.bauteile, stationen);
+    const lage = packe(fertig), alle = stationen.map((_, i) => i + 1);
+    return fertig.map((x, i) => {
+      IDB.legen(x.id, MODELLE.get(x.id));
+      return { id: "B" + (i + 1), name: x.name.trim() || "Bauteil " + (i + 1), x: lage[i].x, y: lage[i].y, w: lage[i].w, h: lage[i].h,
+        form: "modell", modell: x.id, draufsicht: x.draufsicht, min: x.min, max: x.max, ext: x.ext, verlauf: alle.slice() };
+    });
+  }
+  async function ladeModelle(dateien) {
+    const p = ui.projekt;
+    for (const f of dateien) {
+      const platz = { laedt: true, name: f.name.replace(/\.[^.]+$/, "") };
+      p.modelle.push(platz);
+      render();
+      await new Promise(r => setTimeout(r, 30));
+      try {
+        const x = await leseModellDatei(f);
+        Object.assign(platz, x, { laedt: false });
+        p.unterlagen.push({ name: f.name, art: "3D-Modell", index: "A", station: "", modell: x.id });
+      } catch (err) {
+        p.modelle.splice(p.modelle.indexOf(platz), 1);
+        toast(err && err.message ? err.message : `${f.name}: Die Datei ließ sich nicht lesen.`);
+      }
+      if (ui.projekt === p) render();
+    }
+  }
   function projektStarten() {
     const p = ui.projekt;
     const zahlen = state.auftraege.map(a => parseInt(a.id.slice(2), 10));
@@ -1724,7 +2153,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       id, traeger: p.traeger, titel: p.titel.trim(),
       auftrag: { stueckzahl: Math.max(1, parseInt(p.stueckzahl, 10) || 1), termin: p.termin, hinweise: p.hinweise.trim() },
       unterlagen: p.unterlagen.map((u, i) => ({ id: "D" + (i + 1), art: u.art, name: u.name, index: u.index || "A", station: u.station ? nrVonKey[u.station] : null })),
-      stationen, bauteile: layout(p.bauteile, stationen), anmerkungen: [],
+      stationen, bauteile: bauteileAus(p, stationen), anmerkungen: [],
       logistik: { von: 0, nach: 1, status: "angefragt", zeit: jetztIso() }, zurueck: false, abgeschlossen: false
     };
     state.auftraege.unshift(a);
@@ -1782,7 +2211,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       case "plus": ui.modus = "stelle-waehlen"; render(); break;
       case "kreis-zu": ui.kreismenue = null; render(); break;
       case "kreis-art": waehleArt(el.dataset.art); break;
-      case "zur-art": ui.kreismenue = { bauteil: ui.neu.bauteil, stelle: ui.neu.stelle, ziehen: false }; ui.blatt = "zu"; render(); break;
+      case "zur-art": ui.kreismenue = { bauteil: ui.neu.bauteil, stelle: ui.neu.stelle, punkt: ui.neu.punkt, normal: ui.neu.normal, ziehen: false }; ui.blatt = "zu"; render(); break;
       case "bezug-aendern": ui.neu.aendern = !ui.neu.aendern; render(); break;
       case "bezug": ui.neu.bezug = +el.dataset.nr; ui.neu.gewaehlt = true; render(); break;
       case "foto": $("#fotoInput").click(); break;
@@ -1816,7 +2245,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       /* Projekt anlegen */
       case "projekt-neu": neuesProjekt(null); break;
       case "p-zurueck": if (ui.projekt.schritt === 0) schliesseBlatt(); else { ui.projekt.schritt--; render(); } break;
-      case "p-weiter": if (ui.projekt.schritt === 4) projektStarten(); else { ui.projekt.schritt++; letztesBlatt = null; render(); } break;
+      case "p-weiter": if (ui.projekt.schritt === P_TITEL.length - 1) projektStarten(); else { ui.projekt.schritt++; letztesBlatt = null; render(); } break;
       case "p-bauteile": ui.projekt.bauteile = klemme(ui.projekt.bauteile + (+el.dataset.d), 1, 4); render(); break;
       case "p-waehlen": ui.projekt.waehlen = !ui.projekt.waehlen; render(); break;
       case "p-werk": ui.projekt.n++; ui.projekt.stationen.push({ key: "k" + ui.projekt.n, w: el.dataset.w }); render(); break;
@@ -1830,6 +2259,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
         render(); break;
       }
       case "p-datei": $("#dateiInput").click(); break;
+      case "p-modell": $("#modellInput").click(); break;
+      case "p-modell-weg": {
+        const x = ui.projekt.modelle.splice(+el.dataset.i, 1)[0];
+        if (x) { MODELLE.delete(x.id); ui.projekt.unterlagen = ui.projekt.unterlagen.filter(u => u.modell !== x.id); }
+        render(); break;
+      }
       case "p-dok-weg": ui.projekt.unterlagen.splice(+el.dataset.i, 1); render(); break;
       case "p-scan":
         ui.projekt.scannt = true; render();
@@ -1862,6 +2297,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     } else if (was === "reset") {
       try { localStorage.removeItem(KEY); } catch (e) { /* leer */ }
       state = seed();
+      MODELLE.clear(); IDB.leeren();
       Object.assign(ui, { ebene: "alle", bauteil: null, ansicht: null, offeneAnmerkung: null, logAuftrag: null, auftragAuf: false });
       schliesseAlles();
       if (location.hash) history.replaceState(null, "", location.pathname + location.search);
@@ -1877,6 +2313,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       const [obj, feld] = t.dataset.bind.split(".");
       if (ui[obj]) ui[obj][feld] = t.value;
       if (obj === "antwort") { const b = $("#antwortSenden"); if (b) b.disabled = !(ui.antwort.memo || ui.antwort.text.trim()); }
+    } else if (t.dataset.pm && ui.projekt) {
+      ui.projekt.modelle[+t.dataset.i][t.dataset.pm] = t.value;
     } else if (t.dataset.p && ui.projekt) {
       ui.projekt[t.dataset.p] = t.value;
       const b = $("#pWeiter"); if (b) b.disabled = !projektWeiterOk(ui.projekt);
@@ -1889,6 +2327,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
       if (ui.neu.foto) URL.revokeObjectURL(ui.neu.foto);
       ui.neu.foto = URL.createObjectURL(t.files[0]); ui.neu.striche = [];
       t.value = ""; render();
+    }
+    if (t.id === "modellInput" && t.files && ui.projekt) {
+      const dateien = Array.from(t.files);
+      t.value = "";
+      ladeModelle(dateien);
+      return;
     }
     if (t.id === "dateiInput" && t.files && ui.projekt) {
       Array.from(t.files).forEach(f => {
@@ -1911,6 +2355,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     if (!a) return;
     if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-grip='peek']")) { e.preventDefault(); oeffneUnterlagen(); return; }
     if (state.ich === "LOG" || ui.blatt !== "zu" || ui.kreismenue) return;
+    if (ui.ebene === "bauteil" && Ansicht.aktiv() && /^Arrow/.test(e.key)) {
+      e.preventDefault();
+      const d = { ArrowLeft: [-20, 0], ArrowRight: [20, 0], ArrowUp: [0, -20], ArrowDown: [0, 20] }[e.key];
+      if (d) Ansicht.drehen(d[0], d[1]);
+      return;
+    }
     if (e.key === "ArrowLeft" && ui.ebene === "traeger") { e.preventDefault(); setzeAnsicht(ansicht(a) - 1); }
     else if (e.key === "ArrowRight" && ui.ebene === "traeger") { e.preventDefault(); setzeAnsicht(ansicht(a) + 1); }
     else if (e.key === "+") {
@@ -1972,8 +2422,13 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     if (pinch && zeiger.size >= 2) { bewegePinch(); return; }
     if (!g || g.id !== e.pointerId) return;
     if (g.typ === "lp") {
-      if (Math.hypot(e.clientX - g.x0, e.clientY - g.y0) > 10) { clearTimeout(g.timer); entferneRing(); g = null; }
-    } else if (g.typ === "kreis") markiereChip(e.clientX, e.clientY);
+      if (Math.hypot(e.clientX - g.x0, e.clientY - g.y0) > 10) {
+        clearTimeout(g.timer); entferneRing();
+        g = g.flaeche.dataset.twin === "bauteil3d" ? { typ: "dreh", id: g.id, xl: e.clientX, yl: e.clientY } : null;
+        if (g) fange(g.id);
+      }
+    } else if (g.typ === "dreh") { Ansicht.drehen(e.clientX - g.xl, e.clientY - g.yl); g.xl = e.clientX; g.yl = e.clientY; }
+    else if (g.typ === "kreis") markiereChip(e.clientX, e.clientY);
     else if (g.typ === "tl" || g.typ === "knopf") bewegeZeitleiste(e);
     else if (g.typ === "blatt") bewegeBlatt(e);
     else if (g.typ === "strich") weitereStriche(e);
@@ -1986,7 +2441,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     if (!g || g.id !== e.pointerId) return;
     const geste = g;
     g = null;
-    if (geste.typ === "memo") stoppeAufnahme();
+    if (geste.typ === "dreh") sperreKlick();
+    else if (geste.typ === "memo") stoppeAufnahme();
     else if (geste.typ === "strich") zeichneStriche();
     else if (geste.typ === "lp") {
       clearTimeout(geste.timer); entferneRing();
@@ -2267,7 +2723,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261121103612";
+  const BUILD = "20261121104346";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
