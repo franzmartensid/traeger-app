@@ -516,6 +516,21 @@ img.view3d { object-fit: contain; padding: 28px; }
 .dok-tasten { display: grid; gap: 8px; }
 a.btn { text-decoration: none; }
 .naechste .werk { text-transform: none; letter-spacing: 0; font: 500 15px/1.3 var(--font); color: var(--ink); margin: 0; }
+
+/* ---------- Stelle wählen: alles außer dem Bauteil tritt zurück ---------- */
+.screen.stellenwahl .top,
+.screen.stellenwahl .flaeche > :not(.bwell):not(.twin) { opacity: .28; filter: grayscale(1); pointer-events: none; transition: opacity 200ms var(--ease); }
+.screen.stellenwahl .bwell, .screen.stellenwahl .twin { box-shadow: 0 0 0 2.5px var(--accent); cursor: crosshair; }
+.modus-leiste { position: absolute; left: 12px; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 16;
+  background: var(--ink); color: var(--surface); border-radius: 18px; padding: 12px 8px 12px 14px; display: flex; gap: 12px; align-items: center;
+  animation: leisteEin 220ms var(--ease) both; }
+.modus-leiste .ico { width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; flex: 0 0 auto; }
+.modus-leiste p { margin: 0; flex: 1; min-width: 0; font: 500 15px/1.35 var(--font); }
+.modus-leiste button { border: 0; background: none; color: var(--surface); font: 600 14px/1 var(--font); min-height: 44px; padding: 0 8px;
+  text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 4px; flex: 0 0 auto; }
+.modus-leiste.nochmal { animation: wackeln 380ms var(--ease); }
+@keyframes leisteEin { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes wackeln { 20%, 60% { transform: translateX(-7px); } 40%, 80% { transform: translateX(7px); } }
 </style>
 </head>
 <body>
@@ -529,6 +544,7 @@ a.btn { text-decoration: none; }
       <span class="kreisf"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M14 5v18M5 14h18" style="stroke:var(--card)" stroke-width="3" stroke-linecap="round"/></svg></span>
       <span class="lab">Anmerkung</span>
     </button>
+    <div class="modus-leiste" id="modusLeiste" hidden role="status" aria-live="polite"></div>
     <div class="scrim" id="scrim" data-act="blatt-zu"></div>
     <div class="lift" id="lift" aria-hidden="true"></div>
     <section class="sheet" id="sheet" hidden aria-label="Blatt"></section>
@@ -1046,6 +1062,7 @@ a.btn { text-decoration: none; }
     dok: `<svg width="22" height="22" viewBox="0 0 22 22" ${STROKE}><path d="M5 2h8l4 4v14H5zM13 2v4h4M8 11h6M8 15h6"/></svg>`,
     haken: `<svg width="18" height="18" viewBox="0 0 18 18" ${STROKE}><path d="m4 9.5 3.2 3L14 6"/></svg>`,
     menue: `<svg width="18" height="18" viewBox="0 0 18 18" ${STROKE}><path d="M3 5h12M3 9h12M3 13h12"/></svg>`,
+    tippen: `<svg width="22" height="22" viewBox="0 0 22 22" ${STROKE}><circle cx="11" cy="11" r="3"/><circle cx="11" cy="11" r="8"/></svg>`,
     laden: `<svg width="20" height="20" viewBox="0 0 20 20" ${STROKE}><path d="M10 3v10M5.5 8.5 10 13l4.5-4.5M3.5 16.5h13"/></svg>`,
     modell: `<svg width="22" height="22" viewBox="0 0 22 22" ${STROKE}><path d="M11 2.5 18.5 6.5v9L11 19.5 3.5 15.5v-9zM3.5 6.5 11 10.5l7.5-4M11 10.5v9"/></svg>`,
     abspielen: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 2.5v9l7.5-4.5z" style="fill:var(--card)"/></svg>'
@@ -2270,6 +2287,7 @@ a.btn { text-decoration: none; }
         ${wird ? `<span class="pill st-geplant offline">${wird} Anmerkung${wird > 1 ? "en" : ""} wird gesendet</span>` : ""}</div>
       <div class="flaeche" id="flaeche">${html}</div>`;
     $("#flaeche").scrollTop = altScroll;
+    scr.classList.toggle("stellenwahl", ui.modus === "stelle-waehlen");
     const slot3d = $("#slot3d");
     if (slot3d) Ansicht.anbinden(slot3d, a); else Ansicht.loesen();
     letzteEbene = schluessel;
@@ -2320,6 +2338,18 @@ a.btn { text-decoration: none; }
       && (ui.ebene === "traeger" || ui.ebene === "bauteil");
     fab.hidden = !zeigen;
     fab.style.bottom = ui.ebene === "traeger" ? "112px" : "24px";
+    const leiste = $("#modusLeiste");
+    const waehlen = !!a && ui.modus === "stelle-waehlen";
+    if (waehlen && leiste.hidden) {
+      const wo = ui.ebene === "bauteil" ? "am Bauteil" : "am Träger";
+      leiste.innerHTML = `<span class="ico">${ICO.tippen}</span><p>Tippen Sie auf die Stelle ${wo}, auf die sich die Anmerkung bezieht.</p><button type="button" data-act="modus-zu">Abbrechen</button>`;
+    }
+    leiste.hidden = !waehlen;
+  }
+  function stelleNochmal() {
+    const l = $("#modusLeiste");
+    if (!l || l.hidden) return;
+    l.classList.remove("nochmal"); void l.offsetWidth; l.classList.add("nochmal");
   }
 
   function stellePunkt(a, km, zr) {
@@ -2943,6 +2973,7 @@ a.btn { text-decoration: none; }
     if (demo) { demoHandlung(demo.dataset.demo); return; }
     if (t === $("#kreis")) { ui.kreismenue = null; render(); return; }
     if (t.closest("#gross")) { clearTimeout(grossT); grossWeg(); return; }
+    if (ui.modus === "stelle-waehlen" && !t.closest("#slot3d, #bpart, .bwell, #twin, #modusLeiste, #demo")) { ui.modus = null; render(); return; }
     const el = t.closest("[data-act]");
     if (!el || el.disabled) return;
     const a = cur();
@@ -2978,6 +3009,7 @@ a.btn { text-decoration: none; }
         break;
       case "auftrag-auf": ui.auftragAuf = !ui.auftragAuf; render(); break;
       case "plus": ui.modus = "stelle-waehlen"; render(); break;
+      case "modus-zu": ui.modus = null; render(); break;
       case "kreis-zu": ui.kreismenue = null; render(); break;
       case "kreis-art": waehleArt(el.dataset.art); break;
       case "zur-art": ui.kreismenue = { bauteil: ui.neu.bauteil, stelle: ui.neu.stelle, punkt: ui.neu.punkt, normal: ui.neu.normal, ziehen: false }; ui.blatt = "zu"; render(); break;
@@ -3280,7 +3312,11 @@ a.btn { text-decoration: none; }
   function entferneRing() { const r = $("#lpRing"); if (r) r.remove(); }
   function tippeFlaeche(x, y, flaeche) {
     const a = cur();
-    if (ui.modus === "stelle-waehlen") { if (darfAnmerken(a)) oeffneKreis(x, y, false); return; }
+    if (ui.modus === "stelle-waehlen") {
+      if (!darfAnmerken(a)) return;
+      if (stelleAus(x, y)) { sperreKlick(); oeffneKreis(x, y, false); } else stelleNochmal();
+      return;
+    }
     if (flaeche.dataset.twin === "traeger") { const b = teilBei(x, y); if (b) { sperreKlick(); oeffneBauteil(b.id); } }
   }
 
@@ -3492,7 +3528,7 @@ a.btn { text-decoration: none; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261121123609";
+  const BUILD = "20261123090142";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
