@@ -610,6 +610,11 @@ a.btn { text-decoration: none; }
 .klein-feld { margin-top: 8px; gap: 4px; }
 .klein-feld > .beschr { font: 400 14px/1.3 var(--font); letter-spacing: 0; text-transform: none; color: var(--grey); }
 .sb-neu { height: 20px; padding: 0 8px; margin-right: 6px; font-size: 11px; vertical-align: 1px; }
+
+/* Aufgeräumt: nur noch eine gestrichelte Linie im Zwilling, um Teile, die noch nicht gefertigt sind */
+.twin::before { display: none; }
+.stufe-zeile { grid-template-columns: 44px minmax(0, 1fr) 40px; row-gap: 2px; }
+.stufe-zeile .sz-modell { grid-column: 2 / 4; grid-row: 2; justify-self: start; min-height: 32px; display: flex; align-items: center; }
 </style>
 </head>
 <body>
@@ -1267,7 +1272,7 @@ a.btn { text-decoration: none; }
   function aktuelleStufe(a, b, v) {
     const L = stufenVon(a, b);
     let k = 0;
-    L.forEach((x, i) => { if (i > 0 && stufeFertig(a, x, v)) k = i; });
+    L.forEach((x, i) => { if (i > 0 && x.modell && stufeFertig(a, x, v)) k = i; });
     return L[k];
   }
   /* Ziel: die Stufe, die die Station, die jetzt dran ist, aus dem Bauteil macht */
@@ -1284,7 +1289,7 @@ a.btn { text-decoration: none; }
   const zeigtZiel = a => state.ich === "AG" || (istWerk() && meinNr(a) === jetzt(a));
   /* Platz im Zwilling: so groß wie die größte Stufe, damit ein Wechsel der Stufe nichts verschiebt */
   function platzExt(b) {
-    const E = [b.ext].concat((b.stufen || []).map(x => x.ext)).filter(Boolean);
+    const E = [b.ext].concat((b.stufen || []).filter(x => x.modell).map(x => x.ext)).filter(Boolean);
     return [0, 1, 2].map(i => Math.max.apply(null, E.map(e => e[i])));
   }
   /* Rechteck einer Stufe im Platz, mittig, im gemeinsamen Maßstab (x, w in Einheiten; y, h in Prozent der Höhe) */
@@ -1454,7 +1459,7 @@ a.btn { text-decoration: none; }
 
   /* Zwilling als SVG mit viewBox in Prozent der Trägerfläche (Höhe 80 %).
      Noch nicht gefertigte Teile erscheinen blass an ihrem Platz, gefertigte kräftig. */
-  function zwillingSvg(a, sel, v = jetzt(a), mitZiel = false, mitText = false) {
+  function zwillingSvg(a, sel, v = jetzt(a), mitZiel = false) {
     const lage = lageVon(a, v), liste = zwillingTeile(a, v), j = jetzt(a), jq = st(a, j);
     const teile = liste.map(b => {
       const P = lage.get(b.id);
@@ -1464,38 +1469,18 @@ a.btn { text-decoration: none; }
       const x = L.x, y = L.y * .8, w = L.w, h = L.h * .8, s = sel === b.id;
       if (b.form === "modell") {
         const r = cls => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="2" ry="2"/>`;
-        /* Was die Station, die jetzt dran ist, aus dem Teil macht */
+        /* Die Station, die jetzt dran ist: Was bei ihr entsteht, hat einen orangen Platz; was sie bearbeitet, ist orange */
         const eigen = mitZiel && !da && jq && b.entsteht === jq.uid && jq.status !== "abgeschlossen";
-        const z = mitZiel && da ? zielStufe(a, b, v) : null;
-        let ziel = "";
-        if (z && !z.gruppe) {
-          const Z = stufenRect(b, z, P), zy = Z.y * .8, zh = Z.h * .8;
-          ziel = z.kontur ? `<image class="ziel-bild" href="${z.kontur}" x="${Z.x}" y="${zy}" width="${Z.w}" height="${zh}" preserveAspectRatio="none"/>`
-            : `<rect class="soll-platz ziel" x="${Z.x}" y="${zy}" width="${Z.w}" height="${zh}" rx="2" ry="2"/>`;
-        }
-        return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}${z || eigen ? " mit-ziel" : ""}">${s ? r("halo") : ""}${da ? "" : r("soll-platz" + (eigen ? " ziel" : ""))}<image href="${stufe.draufsicht}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/>${ziel}${s ? r("part sel rahmen") : ""}</g>`;
+        const bearbeiten = mitZiel && da && !!zielStufe(a, b, v);
+        const ton = bearbeiten ? ' filter="url(#orangeTon)"' : "";
+        return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}${eigen ? " entsteht" : ""}${bearbeiten ? " bearbeiten" : ""}">${s ? r("halo") : ""}${da ? "" : r("soll-platz" + (eigen ? " ziel" : ""))}<image href="${stufe.draufsicht}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"${ton}/>${s ? r("part sel rahmen") : ""}</g>`;
       }
       const form = cls => (b.form === "rund"
         ? `<ellipse class="${cls}" cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}"/>`
         : `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="3.4" ry="3.4"/>`);
-      return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}">${s ? form("halo") : ""}${form(s ? "part sel" : "part")}</g>`;
+      const eigenF = mitZiel && !da && jq && b.entsteht === jq.uid && jq.status !== "abgeschlossen";
+      return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}${eigenF ? " entsteht" : ""}">${s ? form("halo") : ""}${form(s ? "part sel" : "part")}</g>`;
     }).join("");
-    let rahmen = "", gruppenZiel = "";
-    offeneGruppen(a, v).forEach(g => {
-      const glieder = g.teile.map(id => a.bauteile.find(q => q.id === id)).filter(q => q && lage.get(q.id));
-      if (glieder.length < 2) return;
-      const Ps = glieder.map(q => lage.get(q.id));
-      const x0 = Math.max(.8, Math.min.apply(null, Ps.map(P => P.x)) - 2.2), x1 = Math.min(99.2, Math.max.apply(null, Ps.map(P => P.x + P.w)) + 2.2);
-      const y0 = Math.max(.8, Math.min.apply(null, Ps.map(P => P.y * .8)) - 2.2), y1 = Math.min(75.5, Math.max.apply(null, Ps.map(P => (P.y + P.h) * .8)) + 2.2);
-      const q = stUid(a, g.entsteht);
-      const hier = mitZiel && jq && g.entsteht === jq.uid && jq.status !== "abgeschlossen";
-      rahmen += `<rect class="gruppe-rahmen${hier ? " ziel" : ""}" x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" rx="2.5" ry="2.5"/>`;
-      if (mitText && !hier) rahmen += `<text class="gruppe-text" x="${(x0 + x1) / 2}" y="${Math.min(y1 + 3.3, 79.2)}" text-anchor="middle">→ ${esc(g.name)}${q ? " · " + kurzName(a, q.nr) : ""}</text>`;
-      if (hier && g.kontur && g.ext) {
-        const m = Ps[0].w / Math.max(platzExt(glieder[0])[0], 1e-6), gw = g.ext[0] * m, gh = g.ext[2] * m;
-        gruppenZiel += `<image class="ziel-bild gruppen-ziel" href="${g.kontur}" x="${(x0 + x1) / 2 - gw / 2}" y="${(y0 + y1) / 2 - gh / 2}" width="${gw}" height="${gh}" preserveAspectRatio="none"/>`;
-      }
-    });
     const modelle = liste.filter(b => b.form === "modell" && lage.get(b.id)).map(b => lage.get(b.id)).sort((p, q) => p.x - q.x);
     let linien = "";
     for (let i = 0; i + 1 < modelle.length; i++) {
@@ -1503,7 +1488,7 @@ a.btn { text-decoration: none; }
       if (l - r < 0.5) { linien = ""; break; }
       linien += `<line class="trenner" x1="${(r + l) / 2}" y1="4" x2="${(r + l) / 2}" y2="76"/>`;
     }
-    return `<svg viewBox="0 0 100 80" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${linien}${rahmen}${teile}${gruppenZiel}</svg>`;
+    return `<svg viewBox="0 0 100 80" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${linien}${teile}</svg>`;
   }
   /* Lage eines Pins auf dem Zwilling; null, wenn sein Bauteil gerade nicht zu sehen ist */
   function pinPos(a, x, v = jetzt(a)) {
@@ -1511,7 +1496,7 @@ a.btn { text-decoration: none; }
     const P = lageVon(a, v).get(x.bauteil);
     if (!P) return null;
     const b = a.bauteile.find(q => q.id === x.bauteil);
-    const stufe = b && x.modell ? stufenVon(a, b).find(q => q.modell === x.modell) : (b ? stufenVon(a, b)[0] : null);
+    const stufe = b && x.modell ? stufenVon(a, b).find(q => q.modell && q.modell === x.modell) : (b ? stufenVon(a, b)[0] : null);
     const L = b ? stufenRect(b, stufe, P) : P;
     return { x: klemme(L.x + x.stelle.x * L.w, 4, 96), y: klemme(L.y + x.stelle.y * L.h, 5, 95) };
   }
@@ -1614,8 +1599,7 @@ a.btn { text-decoration: none; }
     }
     const pins = a.anmerkungen.filter(x => !rueck || x.von <= v).map(x => { const q = pinPos(a, x, v); return q ? pinHtml(a, x, q) : ""; }).join("");
     const traegerSel = ui.kreismenue && !ui.kreismenue.bauteil ? " traeger-sel" : "";
-    const twin = `<div class="twin${traegerSel}" id="twin" data-twin="traeger" role="group" aria-label="Zwilling des Trägers ${a.traeger}">${zwillingSvg(a, ui.kreismenue && ui.kreismenue.bauteil, v, zeigtZiel(a) && v === j, true)}${pins}</div>`
-      + zielLegende(a, v);
+    const twin = `<div class="twin${traegerSel}" id="twin" data-twin="traeger" role="group" aria-label="Zwilling des Trägers ${a.traeger}">${zwillingSvg(a, ui.kreismenue && ui.kreismenue.bauteil, v, zeigtZiel(a) && v === j)}${pins}</div>`;
     let unten;
     if (ui.kreismenue) {
       unten = "";
@@ -1637,27 +1621,6 @@ a.btn { text-decoration: none; }
     return kopf + twin + unten + `<div class="platz${ui.blatt !== "zu" ? " gross" : ""}"></div>`;
   }
 
-  /* Legende unter dem Zwilling, solange eine Station Bauteile fertigt oder verändert */
-  function zielLegende(a, v) {
-    if (ui.kreismenue || ui.modus) return "";
-    const j = jetzt(a), q = st(a, j);
-    const arbeitet = q && q.status !== "abgeschlossen" && v === j && zeigtZiel(a);
-    const wer = state.ich === "AG" ? `bei ${kurzName(a, j)}` : "bei Ihnen";
-    const liste = zwillingTeile(a, v), teile = [];
-    if (arbeitet) {
-      const um = liste.filter(b => b.form === "modell" && vorhanden(a, b, v) && zielStufe(a, b, v) && !zielStufe(a, b, v).gruppe);
-      const neu = liste.filter(b => b.form === "modell" && !vorhanden(a, b, v) && b.entsteht === q.uid);
-      if (um.length) teile.push(`<span><i class="lg-ziel"></i>Nach Bearbeitung ${wer}: ${um.map(b => esc(b.name)).join(", ")}</span>`);
-      if (neu.length) teile.push(`<span><i class="lg-neu"></i>Entsteht ${wer}: ${neu.map(b => esc(b.name)).join(", ")}</span>`);
-    }
-    offeneGruppen(a, v).forEach(g => {
-      const namen = g.teile.map(id => esc(bauteilName(a, id))).join(" + ");
-      const gq = stUid(a, g.entsteht);
-      if (arbeitet && g.entsteht === q.uid) teile.push(`<span><i class="lg-ziel"></i>Wird ${wer} gefügt: ${namen} → ${esc(g.name)}</span>`);
-      else if (gq) teile.push(`<span><i class="lg-gruppe"></i>Wird gefügt bei ${kurzName(a, gq.nr)}: ${namen}</span>`);
-    });
-    return teile.length ? `<p class="ziel-legende">${teile.join("")}</p>` : "";
-  }
   function knotenKlasse(a, nr, j) {
     const E = ende(a);
     if (nr === 0) return j === 0 && !a.logistik ? "n-jetzt" : "n-fertig";
@@ -1708,7 +1671,8 @@ a.btn { text-decoration: none; }
     /* Stufen: jetzt oder, während die Station daran arbeitet, nach der Bearbeitung */
     const L = stufenVon(a, b), da = vorhanden(a, b, j);
     const jetztStufe = da ? aktuelleStufe(a, b, j) : L[0];
-    const ziel = zeigtZiel(a) && ansicht(a) === j && da ? zielStufe(a, b, j) : null;
+    const zielRoh = zeigtZiel(a) && ansicht(a) === j && da ? zielStufe(a, b, j) : null;
+    const ziel = zielRoh && zielRoh.modell && zielRoh.modell !== jetztStufe.modell ? zielRoh : null;
     if (!ziel) ui.zielSicht = false;
     const gezeigt = ziel && ui.zielSicht ? ziel : jetztStufe;
     const gk = L.indexOf(gezeigt);
@@ -1716,7 +1680,6 @@ a.btn { text-decoration: none; }
     const umschalter = ziel ? `<div class="seg stufen-seg" role="group" aria-label="Stand des Bauteils">
         <button type="button" data-act="stufe-zeigen" data-z="0" aria-pressed="${!ui.zielSicht}">Jetzt</button>
         <button type="button" data-act="stufe-zeigen" data-z="1" aria-pressed="${!!ui.zielSicht}">${ziel.gruppe ? "Nach dem Fügen" : "Nach Bearbeitung"}</button></div>` : "";
-    const stufenInfo = gezeigt.gruppe ? `Nach dem Fügen: ${gezeigt.name}` : L.length > 1 ? `Stufe ${gk + 1} von ${L.length}${gezeigt.bei && gezeigt.bei !== "AG" && stUid(a, gezeigt.bei) && gk > 0 ? " · nach " + kurzName(a, stUid(a, gezeigt.bei).nr) + " · " + WERK[stUid(a, gezeigt.bei).werkstatt].verfahren : ""}` : "";
     const zeilen = verlaufVon(a, b).map(nr => {
       const chips = a.anmerkungen.filter(x => x.bauteil === b.id && x.von === nr).map(x => chip(x.art, "s")).join("");
       return `<button class="vrow" type="button" data-act="rueckblick" data-nr="${nr}">
@@ -1728,10 +1691,10 @@ a.btn { text-decoration: none; }
     const eigene = L.map(x => x.modell), alle = [].concat.apply([], a.bauteile.map(q => stufenVon(a, q).map(x => x.modell)));
     const doks = a.unterlagen.filter(u => !u.modell || eigene.includes(u.modell) || !alle.includes(u.modell));
     return `<div class="head"><div class="kopf-l"><button class="textbtn" type="button" data-act="ebene" data-ebene="traeger" style="min-height:32px">‹ Träger ${a.id}</button>
-        <h1 class="titel">${esc(b.name)}</h1><p class="neben">${esc(entstehungText(a, b))}</p>${stufenInfo ? `<p class="neben">${esc(stufenInfo)}</p>` : ""}</div></div>
+        <h1 class="titel">${esc(b.name)}</h1></div></div>
       ${umschalter}
       ${b.form === "modell"
-        ? `<div class="bwell b3d${ziel && ui.zielSicht ? " ziel-sicht" : ""}" id="slot3d" data-twin="bauteil3d" data-bt="${b.id}" data-modell="${gezeigt.modell}" data-bild="${gk}" role="group" aria-label="3D-Modell ${esc(b.name)}${ziel && ui.zielSicht ? ", nach der Bearbeitung" : ""}">${ziel && ui.zielSicht ? `<span class="ziel-marke">${ziel.gruppe ? "Nach dem Fügen" : "Nach Bearbeitung"}</span>` : ""}${pins3d}</div>`
+        ? `<div class="bwell b3d${ziel && ui.zielSicht ? " ziel-sicht" : ""}" id="slot3d" data-twin="bauteil3d" data-bt="${b.id}" data-modell="${gezeigt.modell}" data-bild="${gk}" role="group" aria-label="3D-Modell ${esc(b.name)}${ziel && ui.zielSicht ? ", nach der Bearbeitung" : ""}">${pins3d}</div>`
         : `<div class="bwell"><div class="bpart${b.form === "rund" ? " rund" : ""}" id="bpart" data-twin="bauteil" style="aspect-ratio:${verhaeltnis};${groesse}">${pins}</div></div>`}
       <section class="karte"><h2 class="ktitel">Verlauf dieses Bauteils</h2><div class="verlauf">${zeilen}</div></section>
       <section class="karte"><h2 class="ktitel">Unterlagen</h2>${dokZeilen(doks) || '<p class="leer">Keine Unterlagen</p>'}</section>
@@ -2063,8 +2026,7 @@ a.btn { text-decoration: none; }
     const wie = b => {
       if (b.art === "baugruppe") return "gefügt aus " + b.teile.map(id => esc(bauteilName(a, id))).join(", ");
       if (b.entsteht === uid) return "gefertigt";
-      const L = stufenVon(a, b), k = L.findIndex(x => x.bei === uid);
-      return `bearbeitet · Stufe ${k + 1} von ${L.length}`;
+      return "bearbeitet";
     };
     const entsteht = hier.length ? `<section class="karte"><h2 class="ktitel">Bei Ihnen entstanden</h2>${hier.map(b => `<div class="zeile"><span style="color:var(--ink)">${ICO.haken}</span><span class="rest"><span class="text">${esc(b.name)}</span><span class="neben">${wie(b)}</span></span></div>`).join("")}</section>` : "";
     const naechste = `<section class="karte"><h2 class="ktitel">${nach === E ? "Rückkehr" : "Nächste Station"}</h2><div class="naechste"><span class="rund">${knotenText(a, nach)}</span>
@@ -2112,11 +2074,14 @@ a.btn { text-decoration: none; }
           <span class="rest"><input data-pm="name" data-i="${k}" value="${esc(x.name)}" aria-label="Name des Bauteils" autocomplete="off"><span class="neben">${masse([x.ext[0], x.ext[2], x.ext[1]])} mm · ${x.dreiecke.toLocaleString("de-DE")} Dreiecke</span>
           <label class="klein-feld"><span class="beschr">Entsteht bei</span><select data-pm="entsteht" data-i="${k}">${optStationen(pEntsteht(p, x), true)}</select></label></span>
           <button class="mini-btn" type="button" data-act="p-modell-weg" data-i="${k}" aria-label="${esc(x.name)} entfernen">×</button>
-          <div class="stufen-block">${(x.stufen || []).map((st, n) => (st.laedt ? `<div class="stufe-zeile"><span class="vorschau klein"></span><span class="rest neben">Stufe ${n + 2} wird gelesen …</span></div>`
-            : `<div class="stufe-zeile"><span class="vorschau klein"><img src="${st.draufsicht}" alt=""></span>
-              <label class="klein-feld"><span class="beschr">Stufe ${n + 2} · nach</span><select data-pst="bei" data-i="${k}" data-k="${n}">${optStationen(pStufeBei(p, x, n), false)}</select></label>
-              <button class="mini-btn" type="button" data-act="p-stufe-weg" data-i="${k}" data-k="${n}" aria-label="Stufe ${n + 2} entfernen">×</button></div>`)).join("")}
-          ${p.stationen.length ? `<button class="textbtn klein" type="button" data-act="p-stufe" data-i="${k}">+ Stufe nach einer Bearbeitung</button>` : ""}</div></div>`)).join("");
+          <div class="stufen-block">${(x.stufen || []).map((st, n) => `<div class="stufe-zeile">
+              <span class="vorschau klein">${st.draufsicht && !st.laedt ? `<img src="${st.draufsicht}" alt="">` : ""}</span>
+              <label class="klein-feld"><span class="beschr">Bearbeitung bei</span><select data-pst="bei" data-i="${k}" data-k="${n}">${optStationen(pStufeBei(p, x, n), false)}</select></label>
+              <button class="mini-btn" type="button" data-act="p-stufe-weg" data-i="${k}" data-k="${n}" aria-label="Bearbeitung entfernen">×</button>
+              ${st.laedt ? `<span class="sz-modell neben">wird gelesen …</span>`
+                : st.id ? `<span class="sz-modell neben">Neues 3D-Modell · ${esc(st.name)}</span>`
+                : `<button class="sz-modell textbtn klein" type="button" data-act="p-stufe-modell" data-i="${k}" data-k="${n}">3D-Modell nach der Bearbeitung</button>`}</div>`).join("")}
+          ${p.stationen.length ? `<button class="textbtn klein" type="button" data-act="p-stufe" data-i="${k}">+ Bearbeitung</button>` : ""}</div></div>`)).join("");
     const ohne = p.modelle.length ? "" : `<section class="karte"><h2 class="ktitel">Bauteile ohne 3D-Modell</h2>
         <div class="kglied"><button class="mini-btn" type="button" data-act="p-bauteile" data-d="-1" aria-label="Weniger Bauteile" ${p.bauteile <= 1 ? "disabled" : ""}>−</button>
         <span class="titel num" style="min-width:40px;text-align:center">${p.bauteile}</span>
@@ -2190,7 +2155,7 @@ a.btn { text-decoration: none; }
       const tags = p.unterlagen.map(u => `<span class="tag">${esc(u.art)} · Index ${esc(u.index)}</span>`).join("");
       body = `<section class="karte"><p class="beschr">Auftrag</p><h2 class="ktitel">${esc(p.titel)}</h2><p class="neben">${p.stueckzahl} Stück · Termin ${fmtDatum(p.termin)} · ${bauteilZahl(p)} Bauteil${bauteilZahl(p) > 1 ? "e" : ""}</p></section>
         ${p.modelle.length ? `<section class="karte"><p class="beschr">Bauteile</p><div class="modellreihe">${p.modelle.map(x => `<img src="${x.draufsicht}" alt="${esc(x.name)}">`).join("")}</div>
-          ${p.modelle.filter(x => (x.stufen || []).length).map(x => `<p class="neben">${esc(x.name)}: ${(x.stufen || []).length + 1} Stufen</p>`).join("")}</section>` : ""}
+          ${p.modelle.filter(x => (x.stufen || []).length).map(x => `<p class="neben">${esc(x.name)}: ${(x.stufen || []).length} Bearbeitung${(x.stufen || []).length > 1 ? "en" : ""}</p>`).join("")}</section>` : ""}
         ${p.baugruppen.length ? `<section class="karte"><p class="beschr">Baugruppen</p>${p.baugruppen.map(g => {
           const k = p.stationen.findIndex(q => q.key === pFuegt(p, g));
           return `<div class="zeile"><span class="rest"><span class="text">${esc(g.name)}</span><span class="neben">${g.teile.map(id => esc((p.modelle.find(x => x.id === id) || {}).name || "")).join(" + ")} · gefügt bei Station ${k + 1}</span></span></div>`;
@@ -2336,6 +2301,16 @@ a.btn { text-decoration: none; }
   }
   /* Draufsicht als Bild wie die übrigen Bauteile: weiße Fläche mit Rand in --line.
      Tiefer liegende Flächen etwas dunkler (zwischen --grey und --card), damit Stufen sichtbar sind. */
+  /* Orange Fassung einer Draufsicht: Helligkeit wird auf --accent abgebildet, die hellsten Flächen halb Richtung --accent-soft */
+  function orangeFilterAnlegen() {
+    if (document.getElementById("orangeTon")) return;
+    const d = tokenFarbe("--accent"), h = tokenFarbe("--accent-soft");
+    /* Dunkle und mittlere Töne werden volles Orange, nur die hellsten Flächen gehen bis zur Hälfte Richtung hellem Orange */
+    const k = i => { const m = (d[i] + (h[i] - d[i]) * .5).toFixed(4), v = d[i].toFixed(4); return `type="table" tableValues="${v} ${v} ${v} ${v} ${m}"`; };
+    document.body.insertAdjacentHTML("beforeend", `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><filter id="orangeTon" color-interpolation-filters="sRGB">
+      <feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0"/>
+      <feComponentTransfer><feFuncR ${k(0)}/><feFuncG ${k(1)}/><feFuncB ${k(2)}/></feComponentTransfer></filter></svg>`);
+  }
   /* Zielumriss: Silhouette von oben, als orange Kontur mit zartem Grund. Gleicher Ausschnitt wie die Draufsicht. */
   function kontur(m, maxPx) {
     const rand = 3;
@@ -3283,7 +3258,7 @@ a.btn { text-decoration: none; }
     const fertig = p.modelle.filter(x => !x.laedt);
     if (!fertig.length) return layout(p.bauteile, stationen);
     if (fertig.length > 1 && reiheMassstab(fertig, true) > reiheMassstab(fertig, false) * 1.05) {
-      fertig.concat(p.baugruppen.filter(g => !g.laedt)).forEach(x => [x].concat(x.stufen || []).forEach(y => {
+      fertig.concat(p.baugruppen.filter(g => !g.laedt)).forEach(x => [x].concat((x.stufen || []).filter(y => y.id)).forEach(y => {
         const m = MODELLE.get(y.id);
         if (!m) return;
         const g = drehe90(m);
@@ -3297,9 +3272,11 @@ a.btn { text-decoration: none; }
       idVonModell[x.id] = "B" + (i + 1);
       return { id: "B" + (i + 1), name: x.name.trim() || "Bauteil " + (i + 1), x: lage[i].x, y: lage[i].y, w: lage[i].w, h: lage[i].h,
         form: "modell", modell: x.id, draufsicht: x.draufsicht, kontur: x.kontur, min: x.min, max: x.max, ext: x.ext, entsteht: uidVonKey(pEntsteht(p, x)),
-        stufen: (x.stufen || []).filter(y => !y.laedt).map((y, n) => {
+        stufen: (x.stufen || []).filter(y => !y.laedt).map(y => {
+          const bei = uidVonKey(pStufeBei(p, x, (x.stufen || []).indexOf(y)));
+          if (!y.id) return { modell: null, bei };
           IDB.legen(y.id, MODELLE.get(y.id));
-          return { modell: y.id, draufsicht: y.draufsicht, kontur: y.kontur, min: y.min, max: y.max, ext: y.ext, bei: uidVonKey(pStufeBei(p, x, (x.stufen || []).indexOf(y))) };
+          return { modell: y.id, draufsicht: y.draufsicht, kontur: y.kontur, min: y.min, max: y.max, ext: y.ext, bei };
         }) };
     });
     const gruppen = p.baugruppen.filter(g => !g.laedt && g.teile.length >= 2).map((g, i) => {
@@ -3312,26 +3289,30 @@ a.btn { text-decoration: none; }
   async function ladeModelle(dateien) {
     const p = ui.projekt;
     const alsGruppe = p.modellZiel === "gruppe";
-    const stufeVon = String(p.modellZiel).indexOf("stufe:") === 0 ? p.modelle[+p.modellZiel.slice(6)] : null;
+    const zielTeile = String(p.modellZiel).indexOf("stufe:") === 0 ? p.modellZiel.slice(6).split(":") : null;
+    const stufeVon = zielTeile ? p.modelle[+zielTeile[0]] : null;
+    const zielZeile = zielTeile && zielTeile[1] != null && stufeVon && stufeVon.stufen ? stufeVon.stufen[+zielTeile[1]] : null;
     p.modellZiel = "teil";
     for (const f of dateien) {
       const platz = { laedt: true, name: f.name.replace(/\.[^.]+$/, "") };
-      if (stufeVon) {
-        stufeVon.stufen = stufeVon.stufen || [];
-        stufeVon.stufen.push(platz);
+      if (stufeVon && zielZeile) {
+        /* 3D-Modell für eine schon angelegte Bearbeitung */
+        const alt = zielZeile.id;
+        zielZeile.laedt = true;
         render();
         await new Promise(r => setTimeout(r, 30));
         try {
           const x = await leseModellDatei(f);
-          Object.assign(platz, x, { laedt: false, bei: "" });
-          platz.bei = pStufeBei(p, stufeVon, stufeVon.stufen.indexOf(platz));
+          const bei = zielZeile.bei;
+          Object.assign(zielZeile, x, { laedt: false, bei });
+          if (alt) { MODELLE.delete(alt); p.unterlagen = p.unterlagen.filter(u => u.modell !== alt); }
           p.unterlagen.push({ name: f.name, art: "3D-Modell", index: "A", station: "", modell: x.id, datei: f });
         } catch (err) {
-          stufeVon.stufen.splice(stufeVon.stufen.indexOf(platz), 1);
+          zielZeile.laedt = false;
           toast(err && err.message ? err.message : `${f.name}: Die Datei ließ sich nicht lesen.`);
         }
         if (ui.projekt === p) render();
-        continue;
+        break;
       }
       if (alsGruppe) {
         Object.assign(platz, { teile: [], fuegt: "" });
@@ -3600,10 +3581,17 @@ a.btn { text-decoration: none; }
       }
       case "p-dok-weg": ui.projekt.unterlagen.splice(+el.dataset.i, 1); render(); break;
       case "p-gruppe": ui.projekt.modellZiel = "gruppe"; $("#modellInput").click(); break;
-      case "p-stufe": ui.projekt.modellZiel = "stufe:" + el.dataset.i; $("#modellInput").click(); break;
+      case "p-stufe": {
+        const x = ui.projekt.modelle[+el.dataset.i];
+        x.stufen = x.stufen || [];
+        x.stufen.push({ bei: "" });
+        x.stufen[x.stufen.length - 1].bei = pStufeBei(ui.projekt, x, x.stufen.length - 1);
+        render(); break;
+      }
+      case "p-stufe-modell": ui.projekt.modellZiel = "stufe:" + el.dataset.i + ":" + el.dataset.k; $("#modellInput").click(); break;
       case "p-stufe-weg": {
         const x = ui.projekt.modelle[+el.dataset.i], st = x.stufen.splice(+el.dataset.k, 1)[0];
-        if (st) { MODELLE.delete(st.id); ui.projekt.unterlagen = ui.projekt.unterlagen.filter(u => u.modell !== st.id); }
+        if (st && st.id) { MODELLE.delete(st.id); ui.projekt.unterlagen = ui.projekt.unterlagen.filter(u => u.modell !== st.id); }
         render(); break;
       }
       case "p-gruppe-teil": {
@@ -4159,7 +4147,7 @@ a.btn { text-decoration: none; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261123113559";
+  const BUILD = "20261123115143";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
@@ -4182,6 +4170,7 @@ a.btn { text-decoration: none; }
   });
   window.addEventListener("resize", () => { if (!g) render(); });
 
+  orangeFilterAnlegen();
   render();
   hashAuswerten();
   setTimeout(zeigeEingang, 700);
