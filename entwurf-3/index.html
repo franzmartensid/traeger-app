@@ -589,6 +589,27 @@ a.btn { text-decoration: none; }
 .gruppe-rahmen.ziel { stroke: var(--accent); stroke-width: 1.8px; }
 .gruppe-text { font: 600 2.7px var(--font); fill: var(--grey); letter-spacing: .02em; }
 .ziel-legende .lg-gruppe { border: 1.6px dashed var(--grey); }
+
+/* ---------- Station mit Leistung (Projekt anlegen, Kette bearbeiten) ---------- */
+.stationsblock { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 12px; align-items: start; padding: 8px 0 14px; }
+.stationsblock .knoten { grid-column: 1; grid-row: 1; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 700 13px/1 var(--font);
+  background: var(--surface); box-shadow: inset 0 0 0 1.3px var(--part-line); color: var(--ink); z-index: 1; }
+.stationsblock .knoten.n-fertig { background: var(--ink); color: var(--surface); box-shadow: none; }
+.stationsblock .knoten.n-jetzt { background: var(--accent); color: #fff; box-shadow: none; }
+.sb-name { grid-column: 2; grid-row: 1; min-height: 32px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font: 600 16px/1.25 var(--font); color: var(--ink); }
+.sb-tasten { grid-column: 3; grid-row: 1; display: flex; gap: 4px; align-items: center; min-height: 32px; }
+.sb-tasten .mini-btn { width: 32px; height: 32px; font-size: 16px; }
+.sb-tasten .mini-btn::after { inset: -2px; }
+.sb-meta { grid-column: 2 / 4; grid-row: 2; font: 400 14px/1.35 var(--font); color: var(--grey); }
+.sb-leistung { grid-column: 2 / 4; grid-row: 3; margin-top: 8px; width: 100%; min-height: 64px; resize: vertical; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface); padding: 10px 12px; font: 400 15px/1.4 var(--font); color: var(--ink); }
+.sb-leistung:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.sb-leistung::placeholder { color: var(--soft-grey); }
+.kette::before { top: 24px; }
+/* Kleine Feldbeschriftungen in Zeilen: normale Schreibweise wie die Zeile darüber, mit Abstand */
+.klein-feld { margin-top: 8px; gap: 4px; }
+.klein-feld > .beschr { font: 400 14px/1.3 var(--font); letter-spacing: 0; text-transform: none; color: var(--grey); }
+.sb-neu { height: 20px; padding: 0 8px; margin-right: 6px; font-size: 11px; vertical-align: 1px; }
 </style>
 </head>
 <body>
@@ -2076,6 +2097,12 @@ a.btn { text-decoration: none; }
     return (p.stationen[Math.min(i + 1, p.stationen.length - 1)] || {}).key || "";
   }
   const pFuegt = (p, g) => (p.stationen.some(q => q.key === g.fuegt) ? g.fuegt : (p.stationen.find(q => WERK[q.w].verfahren === "Fügen") || p.stationen[p.stationen.length - 1] || {}).key || "");
+  /* Station mit Leistung: Nummer auf Höhe des Namens, Tasten oben rechts, darunter Verfahren und das Feld */
+  function stationsBlock({ nr, name, meta, marke, tasten, feld }) {
+    return `<div class="stationsblock"><span class="knoten${marke === "fest" ? " n-fertig" : marke === "jetzt" ? " n-jetzt" : ""}">${nr}</span>
+      <span class="sb-name">${name}</span><span class="sb-tasten">${tasten || ""}</span>
+      <span class="sb-meta">${meta}</span>${feld || ""}</div>`;
+  }
   function bauteilSchritt(p) {
     const optStationen = (sel, mitAG) => (mitAG ? `<option value="AG" ${sel === "AG" ? "selected" : ""}>Vom Auftraggeber</option>` : "")
       + p.stationen.map((q, k) => `<option value="${q.key}" ${sel === q.key ? "selected" : ""}>Station ${k + 1} · ${esc(WERK[q.w].verfahren)}</option>`).join("");
@@ -2124,11 +2151,11 @@ a.btn { text-decoration: none; }
     } else if (i === 1) {
       const glieder = p.stationen.map((s, k) => {
         const w = WERK[s.w];
-        return `<div class="kglied"><span class="knoten">${k + 1}</span><span class="rest"><span class="ktitel">${esc(w.name)}</span><span class="neben">${esc(w.verfahren)} · Hauptgruppe ${w.hg}</span></span>
-          <button class="mini-btn" type="button" data-act="p-hoch" data-i="${k}" ${k === 0 ? "disabled" : ""} aria-label="${esc(w.name)} nach vorn">↑</button>
-          <button class="mini-btn" type="button" data-act="p-runter" data-i="${k}" ${k === p.stationen.length - 1 ? "disabled" : ""} aria-label="${esc(w.name)} nach hinten">↓</button>
-          <button class="mini-btn" type="button" data-act="p-weg" data-i="${k}" aria-label="${esc(w.name)} entfernen">×</button></div>
-          <label class="feld leistung"><span class="beschr">Leistung</span><textarea data-ps="leistung" data-i="${k}" rows="2">${esc(s.leistung || "")}</textarea></label>`;
+        return stationsBlock({ nr: k + 1, name: esc(w.name), meta: `${esc(w.verfahren)} · Hauptgruppe ${w.hg}`,
+          tasten: `<button class="mini-btn" type="button" data-act="p-hoch" data-i="${k}" ${k === 0 ? "disabled" : ""} aria-label="${esc(w.name)} nach vorn">↑</button>
+            <button class="mini-btn" type="button" data-act="p-runter" data-i="${k}" ${k === p.stationen.length - 1 ? "disabled" : ""} aria-label="${esc(w.name)} nach hinten">↓</button>
+            <button class="mini-btn" type="button" data-act="p-weg" data-i="${k}" aria-label="${esc(w.name)} entfernen">×</button>`,
+          feld: `<textarea class="sb-leistung" data-ps="leistung" data-i="${k}" rows="2" placeholder="Leistung" aria-label="Leistung von ${esc(w.name)}">${esc(s.leistung || "")}</textarea>` });
       }).join("");
       const wahl = p.waehlen ? `<section class="karte wahl">${Object.keys(WERK).map(id => `<button class="zeile" type="button" data-act="p-werk" data-w="${id}">
           <span class="rest"><span class="ktitel">${esc(WERK[id].name)}</span><span class="neben">${esc(WERK[id].verfahren)} · ${esc(WERK[id].adresse)}</span></span><span class="textbtn">Hinzufügen</span></button>`).join("")}</section>` : "";
@@ -2911,18 +2938,19 @@ a.btn { text-decoration: none; }
     const j = jetzt(a);
     const kopf = `<div class="blatt-kopf"><p class="neben">${a.id} · ${esc(a.titel)}</p><h2 class="btitel">Kette bearbeiten</h2></div>`;
     const festZeilen = fest.map(q => {
-      const w = WERK[q.werkstatt], k = q.status === "abgeschlossen" ? "n-fertig" : "n-jetzt";
-      return `<div class="kglied fest"><span class="knoten ${k}">${q.nr}</span><span class="rest"><span class="ktitel">${esc(w.verfahren)}</span><span class="neben">${esc(w.name)}</span></span>${q.nr === j ? '<span class="tl-jetzt" style="position:static;transform:none">jetzt</span>' : statusPill(q.status)}</div>`;
+      const w = WERK[q.werkstatt];
+      return stationsBlock({ nr: q.nr, name: esc(w.name), meta: `${esc(w.verfahren)} · Hauptgruppe ${w.hg}`, marke: q.status === "abgeschlossen" ? "fest" : "jetzt",
+        tasten: q.nr === j ? '<span class="tl-jetzt" style="position:static;transform:none">jetzt</span>' : statusPill(q.status) });
     }).join("");
     const offen = K.liste.map((e, i) => {
       const w = WERK[e.werkstatt], nr = fest.length + i + 1;
       const gebunden = e.uid && stationGebunden(a, e.uid);
       const schleife = a.stationen.some(q => q.werkstatt === e.werkstatt && q.status !== "geplant") || K.liste.some((f, k) => k < i && f.werkstatt === e.werkstatt);
-      return `<div class="kglied"><span class="knoten a">${nr}</span><span class="rest"><span class="ktitel">${esc(w.verfahren)}${e.uid ? "" : ' <span class="pill st-arbeit">neu</span>'}</span><span class="neben">${esc(w.name)}${schleife ? " · erneut" : ""}</span></span>
-          <button class="mini-btn" type="button" data-act="kette-hoch" data-i="${i}" ${i === 0 ? "disabled" : ""} aria-label="${esc(w.name)} nach vorn">↑</button>
+      return stationsBlock({ nr, name: esc(w.name), meta: `${e.uid ? "" : '<span class="pill st-arbeit sb-neu">neu</span>'}${esc(w.verfahren)} · Hauptgruppe ${w.hg}${schleife ? " · erneut" : ""}`,
+        tasten: `<button class="mini-btn" type="button" data-act="kette-hoch" data-i="${i}" ${i === 0 ? "disabled" : ""} aria-label="${esc(w.name)} nach vorn">↑</button>
           <button class="mini-btn" type="button" data-act="kette-runter" data-i="${i}" ${i === K.liste.length - 1 ? "disabled" : ""} aria-label="${esc(w.name)} nach hinten">↓</button>
-          <button class="mini-btn" type="button" data-act="kette-weg" data-i="${i}" ${gebunden ? "disabled" : ""} aria-label="${esc(w.name)} entfernen">×</button></div>
-        <label class="feld leistung"><span class="beschr">Leistung</span><textarea data-kl="leistung" data-i="${i}" rows="2">${esc(e.leistung)}</textarea></label>`;
+          <button class="mini-btn" type="button" data-act="kette-weg" data-i="${i}" ${gebunden ? "disabled" : ""} aria-label="${esc(w.name)} entfernen">×</button>`,
+        feld: `<textarea class="sb-leistung" data-kl="leistung" data-i="${i}" rows="2" placeholder="Leistung" aria-label="Leistung von ${esc(w.name)}">${esc(e.leistung)}</textarea>` });
     }).join("");
     const wahl = K.waehlen ? `<section class="karte wahl">${Object.keys(WERK).map(id => `<button class="zeile" type="button" data-act="kette-werk" data-w="${id}">
         <span class="rest"><span class="ktitel">${esc(WERK[id].name)}</span><span class="neben">${esc(WERK[id].verfahren)}</span></span><span class="textbtn">Hinzufügen</span></button>`).join("")}</section>` : "";
@@ -4131,7 +4159,7 @@ a.btn { text-decoration: none; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261123112203";
+  const BUILD = "20261123113559";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
