@@ -615,6 +615,9 @@ a.btn { text-decoration: none; }
 .twin::before { display: none; }
 .stufe-zeile { grid-template-columns: 44px minmax(0, 1fr) 40px; row-gap: 2px; }
 .stufe-zeile .sz-modell { grid-column: 2 / 4; grid-row: 2; justify-self: start; min-height: 32px; display: flex; align-items: center; }
+.ketten-seg { width: fit-content; margin-top: 10px; }
+.gesperrt { display: block; margin-top: 6px; }
+.stufe-zeile .sz-text { grid-column: 2 / 4; align-self: center; margin: 0; }
 </style>
 </head>
 <body>
@@ -2048,59 +2051,77 @@ a.btn { text-decoration: none; }
     return true;
   }
   const bauteilZahl = p => (p.modelle.length ? p.modelle.length : p.bauteile);
+  const PJ = () => ui.projekt || (ui.kette && ui.kette.p) || null;
   /* Wo ein Teil entsteht: beim Auftraggeber beigelegt oder bei einer Station der Kette */
-  const pEntsteht = (p, x) => (x.entsteht === "AG" || p.stationen.some(q => q.key === x.entsteht) ? x.entsteht : (p.stationen[0] ? p.stationen[0].key : "AG"));
+  const pEntsteht = (p, x) => (x.entsteht === "AG" || p.stationen.some(q => q.key === x.entsteht) ? x.entsteht : ((p.stationen.find(q => !q.fest) || {}).key || "AG"));
   /* Station, nach der eine Stufe gilt: vorgegeben ist die Station nach der vorigen Stufe */
   function pStufeBei(p, x, n) {
     const st = x.stufen[n];
     if (p.stationen.some(q => q.key === st.bei)) return st.bei;
     const vorher = n === 0 ? x.entsteht : x.stufen[n - 1].bei;
     const i = p.stationen.findIndex(q => q.key === vorher);
-    return (p.stationen[Math.min(i + 1, p.stationen.length - 1)] || {}).key || "";
+    const rest = p.stationen.slice(Math.max(i + 1, 0)).filter(q => !q.fest);
+    return (rest[0] || p.stationen.filter(q => !q.fest).pop() || {}).key || "";
   }
-  const pFuegt = (p, g) => (p.stationen.some(q => q.key === g.fuegt) ? g.fuegt : (p.stationen.find(q => WERK[q.w].verfahren === "Fügen") || p.stationen[p.stationen.length - 1] || {}).key || "");
+  const pFuegt = (p, g) => (p.stationen.some(q => q.key === g.fuegt) ? g.fuegt : (p.stationen.find(q => !q.fest && WERK[q.w].verfahren === "Fügen") || p.stationen.filter(q => !q.fest).pop() || {}).key || "");
   /* Station mit Leistung: Nummer auf Höhe des Namens, Tasten oben rechts, darunter Verfahren und das Feld */
   function stationsBlock({ nr, name, meta, marke, tasten, feld }) {
     return `<div class="stationsblock"><span class="knoten${marke === "fest" ? " n-fertig" : marke === "jetzt" ? " n-jetzt" : ""}">${nr}</span>
       <span class="sb-name">${name}</span><span class="sb-tasten">${tasten || ""}</span>
       <span class="sb-meta">${meta}</span>${feld || ""}</div>`;
   }
+  /* Bauteile mit 3D-Daten zuordnen: beim Anlegen und im Lauf (p.lauf). Im Lauf ist gesperrt, was schon passiert ist. */
   function bauteilSchritt(p) {
+    const offen = p.stationen.map((q, k) => Object.assign({ nr: k + 1 }, q));
     const optStationen = (sel, mitAG) => (mitAG ? `<option value="AG" ${sel === "AG" ? "selected" : ""}>Vom Auftraggeber</option>` : "")
-      + p.stationen.map((q, k) => `<option value="${q.key}" ${sel === q.key ? "selected" : ""}>Station ${k + 1} · ${esc(WERK[q.w].verfahren)}</option>`).join("");
-    const zeilen = p.modelle.map((x, k) => (x.laedt
-      ? `<div class="modellzeile"><span class="vorschau"></span><span class="rest"><span class="ktitel">${esc(x.name)}</span><span class="neben">wird gelesen …</span></span></div>`
-      : `<div class="modellzeile"><span class="vorschau"><img src="${x.draufsicht}" alt=""></span>
-          <span class="rest"><input data-pm="name" data-i="${k}" value="${esc(x.name)}" aria-label="Name des Bauteils" autocomplete="off"><span class="neben">${masse([x.ext[0], x.ext[2], x.ext[1]])} mm · ${x.dreiecke.toLocaleString("de-DE")} Dreiecke</span>
-          <label class="klein-feld"><span class="beschr">Entsteht bei</span><select data-pm="entsteht" data-i="${k}">${optStationen(pEntsteht(p, x), true)}</select></label></span>
-          <button class="mini-btn" type="button" data-act="p-modell-weg" data-i="${k}" aria-label="${esc(x.name)} entfernen">×</button>
-          <div class="stufen-block">${(x.stufen || []).map((st, n) => `<div class="stufe-zeile">
-              <span class="vorschau klein">${st.draufsicht && !st.laedt ? `<img src="${st.draufsicht}" alt="">` : ""}</span>
+      + offen.filter(q => !q.fest || q.key === sel).map(q => `<option value="${q.key}" ${sel === q.key ? "selected" : ""}>Station ${q.nr} · ${esc(WERK[q.w].verfahren)}</option>`).join("");
+    const stationText = key => { const q = offen.find(o => o.key === key); return q ? `Station ${q.nr} · ${esc(WERK[q.w].verfahren)}` : "Vom Auftraggeber"; };
+    const zeilen = p.modelle.map((x, k) => {
+      if (x.laedt) return `<div class="modellzeile"><span class="vorschau"></span><span class="rest"><span class="ktitel">${esc(x.name)}</span><span class="neben">wird gelesen …</span></span></div>`;
+      const masz = `${masse([x.ext[0], x.ext[2], x.ext[1]])} mm${x.dreiecke ? " · " + x.dreiecke.toLocaleString("de-DE") + " Dreiecke" : ""}`;
+      const entsteht = x.fest
+        ? `<span class="neben gesperrt">${pEntsteht(p, x) === "AG" ? "Vom Auftraggeber" : "Gefertigt bei " + stationText(pEntsteht(p, x))}</span>`
+        : `<label class="klein-feld"><span class="beschr">Entsteht bei</span><select data-pm="entsteht" data-i="${k}">${optStationen(pEntsteht(p, x), true)}</select></label>
+           ${p.lauf && x.bid ? `<button class="textbtn klein" type="button" data-act="p-modell-tauschen" data-i="${k}">3D-Modell tauschen</button>` : ""}`;
+      const stufen = (x.stufen || []).map((st, n) => {
+        const bild = `<span class="vorschau klein">${st.draufsicht && !st.laedt ? `<img src="${st.draufsicht}" alt="">` : ""}</span>`;
+        if (st.fest) return `<div class="stufe-zeile">${bild}<span class="neben gesperrt sz-text">Bearbeitet bei ${stationText(pStufeBei(p, x, n))}</span></div>`;
+        return `<div class="stufe-zeile">${bild}
               <label class="klein-feld"><span class="beschr">Bearbeitung bei</span><select data-pst="bei" data-i="${k}" data-k="${n}">${optStationen(pStufeBei(p, x, n), false)}</select></label>
               <button class="mini-btn" type="button" data-act="p-stufe-weg" data-i="${k}" data-k="${n}" aria-label="Bearbeitung entfernen">×</button>
               ${st.laedt ? `<span class="sz-modell neben">wird gelesen …</span>`
-                : st.id ? `<span class="sz-modell neben">Neues 3D-Modell · ${esc(st.name)}</span>`
-                : `<button class="sz-modell textbtn klein" type="button" data-act="p-stufe-modell" data-i="${k}" data-k="${n}">3D-Modell nach der Bearbeitung</button>`}</div>`).join("")}
-          ${p.stationen.length ? `<button class="textbtn klein" type="button" data-act="p-stufe" data-i="${k}">+ Bearbeitung</button>` : ""}</div></div>`)).join("");
-    const ohne = p.modelle.length ? "" : `<section class="karte"><h2 class="ktitel">Bauteile ohne 3D-Modell</h2>
+                : st.id ? `<span class="sz-modell neben">Neues 3D-Modell · ${esc(st.name)} <button class="textbtn klein" type="button" data-act="p-stufe-modell" data-i="${k}" data-k="${n}">tauschen</button></span>`
+                : `<button class="sz-modell textbtn klein" type="button" data-act="p-stufe-modell" data-i="${k}" data-k="${n}">3D-Modell nach der Bearbeitung</button>`}</div>`;
+      }).join("");
+      return `<div class="modellzeile"><span class="vorschau"><img src="${x.draufsicht}" alt=""></span>
+          <span class="rest"><input data-pm="name" data-i="${k}" value="${esc(x.name)}" aria-label="Name des Bauteils" autocomplete="off"><span class="neben">${masz}</span>${entsteht}</span>
+          ${x.bid ? "<span></span>" : `<button class="mini-btn" type="button" data-act="p-modell-weg" data-i="${k}" aria-label="${esc(x.name)} entfernen">×</button>`}
+          <div class="stufen-block">${stufen}
+          ${offen.some(q => !q.fest) ? `<button class="textbtn klein" type="button" data-act="p-stufe" data-i="${k}">+ Bearbeitung</button>` : ""}</div></div>`;
+    }).join("");
+    const ohne = p.modelle.length || p.lauf ? "" : `<section class="karte"><h2 class="ktitel">Bauteile ohne 3D-Modell</h2>
         <div class="kglied"><button class="mini-btn" type="button" data-act="p-bauteile" data-d="-1" aria-label="Weniger Bauteile" ${p.bauteile <= 1 ? "disabled" : ""}>−</button>
         <span class="titel num" style="min-width:40px;text-align:center">${p.bauteile}</span>
         <button class="mini-btn" type="button" data-act="p-bauteile" data-d="1" aria-label="Mehr Bauteile" ${p.bauteile >= 4 ? "disabled" : ""}>+</button></div></section>`;
     const fertig = p.modelle.filter(x => !x.laedt);
-    const gruppen = p.baugruppen.map((g, k) => (g.laedt
-      ? `<div class="modellzeile"><span class="vorschau"></span><span class="rest"><span class="ktitel">${esc(g.name)}</span><span class="neben">wird gelesen …</span></span></div>`
-      : `<div class="modellzeile gruppe"><span class="vorschau"><img src="${g.draufsicht}" alt=""></span>
+    const gruppen = p.baugruppen.map((g, k) => {
+      if (g.laedt) return `<div class="modellzeile"><span class="vorschau"></span><span class="rest"><span class="ktitel">${esc(g.name)}</span><span class="neben">wird gelesen …</span></span></div>`;
+      if (g.fest) return `<div class="modellzeile gruppe"><span class="vorschau"><img src="${g.draufsicht}" alt=""></span>
+          <span class="rest"><span class="ktitel">${esc(g.name)}</span><span class="neben gesperrt">Gefügt bei ${stationText(pFuegt(p, g))}</span></span><span></span></div>`;
+      return `<div class="modellzeile gruppe"><span class="vorschau"><img src="${g.draufsicht}" alt=""></span>
           <span class="rest"><input data-pg="name" data-i="${k}" value="${esc(g.name)}" aria-label="Name der Baugruppe" autocomplete="off">
           <span class="wahlreihe" role="group" aria-label="Teile der Baugruppe">${fertig.map(x => {
             const drin = g.teile.includes(x.id), anderswo = !drin && p.baugruppen.some(h => h !== g && h.teile.includes(x.id));
             return `<button class="wahlknopf" type="button" data-act="p-gruppe-teil" data-i="${k}" data-m="${x.id}" aria-pressed="${drin}" ${anderswo ? "disabled" : ""}>${esc(x.name)}</button>`;
           }).join("")}</span>
-          <label class="klein-feld"><span class="beschr">Gefügt bei</span><select data-pg="fuegt" data-i="${k}">${optStationen(pFuegt(p, g), false)}</select></label></span>
-          <button class="mini-btn" type="button" data-act="p-gruppe-weg" data-i="${k}" aria-label="${esc(g.name)} entfernen">×</button></div>`)).join("");
-    const gruppenKarte = fertig.length >= 2 && p.stationen.length
+          <label class="klein-feld"><span class="beschr">Gefügt bei</span><select data-pg="fuegt" data-i="${k}">${optStationen(pFuegt(p, g), false)}</select></label>
+          ${p.lauf && g.gid ? `<button class="textbtn klein" type="button" data-act="p-gruppe-tauschen" data-i="${k}">3D-Modell tauschen</button>` : ""}</span>
+          ${g.gid ? "<span></span>" : `<button class="mini-btn" type="button" data-act="p-gruppe-weg" data-i="${k}" aria-label="${esc(g.name)} entfernen">×</button>`}</div>`;
+    }).join("");
+    const gruppenKarte = fertig.length >= 2 && offen.some(q => !q.fest)
       ? `<section class="karte"><h2 class="ktitel">Baugruppen</h2>${gruppen}
           <button class="btn umriss block" type="button" data-act="p-gruppe">3D-Modell einer Baugruppe wählen</button></section>` : "";
-    return `<button class="btn umriss block" type="button" data-act="p-modell" style="margin-bottom:12px">3D-Modelle wählen</button>
+    return `<button class="btn umriss block" type="button" data-act="p-modell" style="margin-bottom:12px">${p.lauf ? "Bauteile hinzufügen" : "3D-Modelle wählen"}</button>
       ${zeilen ? `<section class="karte">${zeilen}</section>` : ""}${ohne}${gruppenKarte}`;
   }
   function blattProjekt() {
@@ -2897,7 +2918,16 @@ a.btn { text-decoration: none; }
   function oeffneKette() {
     const a = cur();
     if (!darfKetteAendern(a)) return;
-    ui.kette = { liste: a.stationen.filter(q => q.status === "geplant").map(q => ({ uid: q.uid, werkstatt: q.werkstatt, leistung: q.leistung || "" })), waehlen: false };
+    const j = jetzt(a);
+    const kopie = b => ({ id: b.modell, bid: b.id, name: b.name, draufsicht: b.draufsicht, kontur: b.kontur, ext: b.ext, min: b.min, max: b.max,
+      entsteht: b.entsteht || "AG", fest: vorhanden(a, b, j),
+      stufen: (b.stufen || []).map(x => ({ id: x.modell || null, alt: true, name: x.modell ? "bisher" : "", draufsicht: x.draufsicht, kontur: x.kontur, ext: x.ext, min: x.min, max: x.max, bei: x.bei,
+        fest: !!(stUid(a, x.bei) && stUid(a, x.bei).status === "abgeschlossen") })) });
+    ui.kette = { liste: a.stationen.filter(q => q.status === "geplant").map(q => ({ uid: q.uid, werkstatt: q.werkstatt, leistung: q.leistung || "" })), waehlen: false, tab: "stationen",
+      p: { lauf: true, stationen: [], unterlagen: [], modellZiel: "teil",
+        modelle: a.bauteile.filter(b => b.art !== "baugruppe" && b.form === "modell").map(kopie),
+        baugruppen: a.bauteile.filter(b => b.art === "baugruppe").map(g => ({ id: g.modell, gid: g.id, name: g.name, draufsicht: g.draufsicht, kontur: g.kontur, ext: g.ext, min: g.min, max: g.max,
+          teile: g.teile.map(t => (a.bauteile.find(q => q.id === t) || {}).modell).filter(Boolean), fuegt: g.entsteht, fest: vorhanden(a, g, j) })) } };
     ui.blatt = "kette"; ui.blattHoehe = "voll";
     render();
   }
@@ -2911,7 +2941,15 @@ a.btn { text-decoration: none; }
     const K = ui.kette;
     const fest = a.stationen.filter(q => q.status !== "geplant");
     const j = jetzt(a);
-    const kopf = `<div class="blatt-kopf"><p class="neben">${a.id} · ${esc(a.titel)}</p><h2 class="btitel">Kette bearbeiten</h2></div>`;
+    const kopf = `<div class="blatt-kopf"><p class="neben">${a.id} · ${esc(a.titel)}</p><h2 class="btitel">Kette bearbeiten</h2>
+      <div class="seg ketten-seg" role="group" aria-label="Was bearbeiten"><button type="button" data-act="kette-tab" data-tab="stationen" aria-pressed="${K.tab !== "bauteile"}">Stationen</button>
+        <button type="button" data-act="kette-tab" data-tab="bauteile" aria-pressed="${K.tab === "bauteile"}">Bauteile</button></div></div>`;
+    /* Stationen der Arbeitskopie in der neuen Reihenfolge; Abgeschlossenes ist fest */
+    K.p.stationen = fest.map(q => ({ key: q.uid, w: q.werkstatt, fest: q.status === "abgeschlossen" })).concat(K.liste.map(e => ({ key: e.uid, w: e.werkstatt, fest: false })));
+    const laedt = K.p.modelle.some(x => x.laedt || (x.stufen || []).some(y => y.laedt)) || K.p.baugruppen.some(g => g.laedt || (!g.fest && g.teile.length < 2));
+    const fuss = `<div class="fusszeile"><div class="tasten"><button class="btn umriss" type="button" data-act="blatt-zu">Abbrechen</button>
+        <button class="btn pri" type="button" data-act="kette-ok" ${laedt ? "disabled" : ""}>Übernehmen</button></div></div>`;
+    if (K.tab === "bauteile") return { kopf, body: bauteilSchritt(K.p) + fuss };
     const festZeilen = fest.map(q => {
       const w = WERK[q.werkstatt];
       return stationsBlock({ nr: q.nr, name: esc(w.name), meta: `${esc(w.verfahren)} · Hauptgruppe ${w.hg}`, marke: q.status === "abgeschlossen" ? "fest" : "jetzt",
@@ -2919,9 +2957,9 @@ a.btn { text-decoration: none; }
     }).join("");
     const offen = K.liste.map((e, i) => {
       const w = WERK[e.werkstatt], nr = fest.length + i + 1;
-      const gebunden = e.uid && stationGebunden(a, e.uid);
+      const gebunden = !e.neu && (stationGebunden(a, e.uid) || K.p.modelle.some(x => x.entsteht === e.uid || (x.stufen || []).some(y => y.bei === e.uid)) || K.p.baugruppen.some(g => g.fuegt === e.uid));
       const schleife = a.stationen.some(q => q.werkstatt === e.werkstatt && q.status !== "geplant") || K.liste.some((f, k) => k < i && f.werkstatt === e.werkstatt);
-      return stationsBlock({ nr, name: esc(w.name), meta: `${e.uid ? "" : '<span class="pill st-arbeit sb-neu">neu</span>'}${esc(w.verfahren)} · Hauptgruppe ${w.hg}${schleife ? " · erneut" : ""}`,
+      return stationsBlock({ nr, name: esc(w.name), meta: `${e.neu ? '<span class="pill st-arbeit sb-neu">neu</span>' : ""}${esc(w.verfahren)} · Hauptgruppe ${w.hg}${schleife ? " · erneut" : ""}`,
         tasten: `<button class="mini-btn" type="button" data-act="kette-hoch" data-i="${i}" ${i === 0 ? "disabled" : ""} aria-label="${esc(w.name)} nach vorn">↑</button>
           <button class="mini-btn" type="button" data-act="kette-runter" data-i="${i}" ${i === K.liste.length - 1 ? "disabled" : ""} aria-label="${esc(w.name)} nach hinten">↓</button>
           <button class="mini-btn" type="button" data-act="kette-weg" data-i="${i}" ${gebunden ? "disabled" : ""} aria-label="${esc(w.name)} entfernen">×</button>`,
@@ -2933,8 +2971,7 @@ a.btn { text-decoration: none; }
         ${festZeilen}${offen}
         <div class="kglied"><span class="knoten a">A</span><span class="rest"><span class="ktitel">Rückkehr</span></span></div></div>
       <button class="btn umriss block" type="button" data-act="kette-waehlen" aria-expanded="${!!K.waehlen}" style="margin-bottom:12px">${K.waehlen ? "Liste schließen" : "+ Schritt hinzufügen"}</button>${wahl}
-      <div class="fusszeile"><div class="tasten"><button class="btn umriss" type="button" data-act="blatt-zu">Abbrechen</button>
-        <button class="btn pri" type="button" data-act="kette-ok">Übernehmen</button></div></div>`;
+      ${fuss}`;
     return { kopf, body };
   }
   function ketteUebernehmen() {
@@ -2947,9 +2984,9 @@ a.btn { text-decoration: none; }
     const neu = fest.slice(), geaendert = [];
     K.liste.forEach((e, i) => {
       const nr = fest.length + i + 1;
-      let q = e.uid ? stUid(a, e.uid) : null;
+      let q = e.neu ? null : stUid(a, e.uid);
       if (q) { mapNr.set(q.nr, nr); if (q.nr !== nr || (q.leistung || "") !== e.leistung.trim()) geaendert.push(q); q.nr = nr; q.leistung = e.leistung.trim(); }
-      else { q = { uid: "S" + Date.now().toString(36) + i, nr, werkstatt: e.werkstatt, status: "geplant", leistung: e.leistung.trim(), zusatz: true }; geaendert.push(q); }
+      else { q = { uid: e.uid, nr, werkstatt: e.werkstatt, status: "geplant", leistung: e.leistung.trim(), zusatz: true }; geaendert.push(q); }
       neu.push(q);
     });
     const entfernt = a.stationen.filter(q => q.status === "geplant" && !K.liste.some(e => e.uid === q.uid));
@@ -2963,15 +3000,58 @@ a.btn { text-decoration: none; }
     });
     a.unterlagen.forEach(u => { if (u.station != null) { const n = um(u.station); u.station = n == null ? null : n; } });
     if (a.logistik) { a.logistik.von = um(a.logistik.von); a.logistik.nach = um(a.logistik.nach); }
+    const bauteilPost = bauteileUebernehmen(a, K.p);
     LAGE.clear();
     geaendert.forEach(q => {
       const war = vorher.get(q.uid);
       post(q.werkstatt, a, { titel: war == null ? "Zusätzlicher Schritt für Sie" : "Ihre Station wurde geändert", text: `${a.id} · ${kurzName(a, q.nr)} · ${WERK[q.werkstatt].verfahren}` }, true);
     });
     entfernt.forEach(q => post(q.werkstatt, a, { titel: "Ihr Schritt entfällt", text: `${a.id} · ${WERK[q.werkstatt].verfahren}` }, true));
+    bauteilPost.forEach(([uid, namen]) => { const q = stUid(a, uid); if (q) post(q.werkstatt, a, { titel: "Neue 3D-Daten für Sie", text: `${a.id} · ${kurzName(a, q.nr)} · ${namen.join(", ")}` }, true); });
     ui.kette = null; ui.ansicht = null;
     schliesseBlatt();
-    toast(geaendert.length || entfernt.length ? "Kette geändert" : "Keine Änderung");
+    toast(geaendert.length || entfernt.length || bauteilPost.length ? "Änderungen übernommen" : "Keine Änderung");
+  }
+
+  /* Bauteile aus der Arbeitskopie übernehmen. Gibt [Station, Bauteilnamen] zurück, für die Nachricht an die Werkstätten. */
+  function bauteileUebernehmen(a, P) {
+    const betroffen = new Map(), merke = (uid, name) => { if (!uid || uid === "AG") return; if (!betroffen.has(uid)) betroffen.set(uid, []); if (!betroffen.get(uid).includes(name)) betroffen.get(uid).push(name); };
+    const modellDaten = x => ({ modell: x.id, draufsicht: x.draufsicht, kontur: x.kontur, ext: x.ext, min: x.min, max: x.max });
+    let n = a.bauteile.filter(b => b.art !== "baugruppe").reduce((m, b) => Math.max(m, parseInt(b.id.slice(1), 10) || 0), 0);
+    const idVonModell = {};
+    P.modelle.filter(x => !x.laedt).forEach(x => {
+      let b = x.bid ? a.bauteile.find(q => q.id === x.bid) : null;
+      const neu = !b;
+      if (neu) { b = { id: "B" + (++n), form: "modell", x: 0, y: 0, w: 0, h: 0 }; a.bauteile.splice(a.bauteile.filter(q => q.art !== "baugruppe").length, 0, b); }
+      const vorher = JSON.stringify([b.modell, b.entsteht, b.stufen]);
+      b.name = (x.name || "").trim() || b.name || b.id;
+      if (!x.fest) { Object.assign(b, modellDaten(x)); b.entsteht = pEntsteht(P, x); if (x.getauscht || neu) IDB.legen(x.id, MODELLE.get(x.id)); }
+      b.stufen = (x.stufen || []).filter(y => !y.laedt).map((y, k) => {
+        if (y.id && !y.alt) IDB.legen(y.id, MODELLE.get(y.id));
+        const bei = y.fest ? y.bei : pStufeBei(P, x, k);
+        return y.id ? Object.assign(modellDaten(y), { bei }) : { modell: null, bei };
+      });
+      idVonModell[x.id] = b.id;
+      if (neu || vorher !== JSON.stringify([b.modell, b.entsteht, b.stufen])) {
+        if (!x.fest) merke(b.entsteht, b.name);
+        b.stufen.forEach(y => { if (!stUid(a, y.bei) || stUid(a, y.bei).status !== "abgeschlossen") merke(y.bei, b.name); });
+      }
+    });
+    let g0 = a.bauteile.filter(b => b.art === "baugruppe").reduce((m, b) => Math.max(m, parseInt(b.id.slice(1), 10) || 0), 0);
+    P.baugruppen.filter(g => !g.laedt && !g.fest && g.teile.length >= 2).forEach(g => {
+      let b = g.gid ? a.bauteile.find(q => q.id === g.gid) : null;
+      if (!b) { b = { id: "G" + (++g0), art: "baugruppe", form: "modell" }; a.bauteile.push(b); IDB.legen(g.id, MODELLE.get(g.id)); }
+      else if (b.modell !== g.id) IDB.legen(g.id, MODELLE.get(g.id));
+      const vorher = JSON.stringify([b.modell, b.teile, b.entsteht]);
+      Object.assign(b, modellDaten(g), { name: (g.name || "").trim() || b.id, teile: g.teile.map(m => idVonModell[m]).filter(Boolean), entsteht: pFuegt(P, g) });
+      if (vorher !== JSON.stringify([b.modell, b.teile, b.entsteht])) merke(b.entsteht, b.name);
+    });
+    P.unterlagen.forEach((u, i) => {
+      const ablage = "F" + Date.now().toString(36) + "L" + i;
+      dateiSpeichern(ablage, u.datei);
+      a.unterlagen.push({ id: "D" + (a.unterlagen.length + 1) + "L" + i, art: u.art, name: u.name, index: u.index || "A", station: null, modell: u.modell || null, ablage, typ: u.datei.type, groesse: u.datei.size });
+    });
+    return Array.from(betroffen.entries());
   }
 
   /* Ende: Träger leer und wieder frei für das nächste Projekt */
@@ -3287,7 +3367,30 @@ a.btn { text-decoration: none; }
     return teile.concat(gruppen);
   }
   async function ladeModelle(dateien) {
-    const p = ui.projekt;
+    const p = PJ();
+    if (!p) return;
+    const tausch = /^(g?tausch):(\d+)$/.exec(String(p.modellZiel));
+    if (tausch) {
+      /* 3D-Modell eines Bauteils oder einer Baugruppe ersetzen, Name und Zuordnung bleiben */
+      p.modellZiel = "teil";
+      const ziel = tausch[1] === "tausch" ? p.modelle[+tausch[2]] : p.baugruppen[+tausch[2]];
+      const f = dateien[0];
+      if (!ziel || !f) return;
+      const alt = ziel.id;
+      ziel.laedt = true; render();
+      await new Promise(r => setTimeout(r, 30));
+      try {
+        const x = await leseModellDatei(f);
+        Object.assign(ziel, { id: x.id, draufsicht: x.draufsicht, kontur: x.kontur, ext: x.ext, min: x.min, max: x.max, dreiecke: x.dreiecke, laedt: false, getauscht: true });
+        if (tausch[1] === "tausch") p.baugruppen.forEach(g => { g.teile = g.teile.map(m => (m === alt ? x.id : m)); });
+        p.unterlagen.push({ name: f.name, art: "3D-Modell", index: "A", station: "", modell: x.id, datei: f });
+      } catch (err) {
+        ziel.laedt = false;
+        toast(err && err.message ? err.message : `${f.name}: Die Datei ließ sich nicht lesen.`);
+      }
+      if (PJ() === p) render();
+      return;
+    }
     const alsGruppe = p.modellZiel === "gruppe";
     const zielTeile = String(p.modellZiel).indexOf("stufe:") === 0 ? p.modellZiel.slice(6).split(":") : null;
     const stufeVon = zielTeile ? p.modelle[+zielTeile[0]] : null;
@@ -3311,7 +3414,7 @@ a.btn { text-decoration: none; }
           zielZeile.laedt = false;
           toast(err && err.message ? err.message : `${f.name}: Die Datei ließ sich nicht lesen.`);
         }
-        if (ui.projekt === p) render();
+        if (PJ() === p) render();
         break;
       }
       if (alsGruppe) {
@@ -3328,7 +3431,7 @@ a.btn { text-decoration: none; }
           p.baugruppen.splice(p.baugruppen.indexOf(platz), 1);
           toast(err && err.message ? err.message : `${f.name}: Die Datei ließ sich nicht lesen.`);
         }
-        if (ui.projekt === p) render();
+        if (PJ() === p) render();
         continue;
       }
       p.modelle.push(platz);
@@ -3336,13 +3439,13 @@ a.btn { text-decoration: none; }
       await new Promise(r => setTimeout(r, 30));
       try {
         const x = await leseModellDatei(f);
-        Object.assign(platz, x, { laedt: false, entsteht: p.stationen[0] ? p.stationen[0].key : "AG" });
+        Object.assign(platz, x, { laedt: false, entsteht: (p.stationen.find(q => !q.fest) || {}).key || "AG" });
         p.unterlagen.push({ name: f.name, art: "3D-Modell", index: "A", station: "", modell: x.id, datei: f });
       } catch (err) {
         p.modelle.splice(p.modelle.indexOf(platz), 1);
         toast(err && err.message ? err.message : `${f.name}: Die Datei ließ sich nicht lesen.`);
       }
-      if (ui.projekt === p) render();
+      if (PJ() === p) render();
     }
   }
   function projektStarten() {
@@ -3572,42 +3675,45 @@ a.btn { text-decoration: none; }
         render(); break;
       }
       case "p-datei": $("#dateiInput").click(); break;
-      case "p-modell": $("#modellInput").click(); break;
+      case "p-modell": PJ().modellZiel = "teil"; $("#modellInput").click(); break;
+      case "p-modell-tauschen": PJ().modellZiel = "tausch:" + el.dataset.i; $("#modellInput").click(); break;
+      case "p-gruppe-tauschen": PJ().modellZiel = "gtausch:" + el.dataset.i; $("#modellInput").click(); break;
       case "p-modell-weg": {
-        const x = ui.projekt.modelle.splice(+el.dataset.i, 1)[0];
-        if (x) (x.stufen || []).forEach(st => { MODELLE.delete(st.id); ui.projekt.unterlagen = ui.projekt.unterlagen.filter(u => u.modell !== st.id); });
-        if (x) { MODELLE.delete(x.id); ui.projekt.unterlagen = ui.projekt.unterlagen.filter(u => u.modell !== x.id); ui.projekt.baugruppen.forEach(g => { g.teile = g.teile.filter(m => m !== x.id); }); }
+        const P = PJ(), x = P.modelle.splice(+el.dataset.i, 1)[0];
+        if (x) (x.stufen || []).forEach(st => { MODELLE.delete(st.id); P.unterlagen = P.unterlagen.filter(u => u.modell !== st.id); });
+        if (x) { MODELLE.delete(x.id); P.unterlagen = P.unterlagen.filter(u => u.modell !== x.id); P.baugruppen.forEach(g => { g.teile = g.teile.filter(m => m !== x.id); }); }
         render(); break;
       }
       case "p-dok-weg": ui.projekt.unterlagen.splice(+el.dataset.i, 1); render(); break;
-      case "p-gruppe": ui.projekt.modellZiel = "gruppe"; $("#modellInput").click(); break;
+      case "p-gruppe": PJ().modellZiel = "gruppe"; $("#modellInput").click(); break;
       case "p-stufe": {
-        const x = ui.projekt.modelle[+el.dataset.i];
+        const P = PJ(), x = P.modelle[+el.dataset.i];
         x.stufen = x.stufen || [];
         x.stufen.push({ bei: "" });
-        x.stufen[x.stufen.length - 1].bei = pStufeBei(ui.projekt, x, x.stufen.length - 1);
+        x.stufen[x.stufen.length - 1].bei = pStufeBei(P, x, x.stufen.length - 1);
         render(); break;
       }
-      case "p-stufe-modell": ui.projekt.modellZiel = "stufe:" + el.dataset.i + ":" + el.dataset.k; $("#modellInput").click(); break;
+      case "p-stufe-modell": PJ().modellZiel = "stufe:" + el.dataset.i + ":" + el.dataset.k; $("#modellInput").click(); break;
       case "p-stufe-weg": {
-        const x = ui.projekt.modelle[+el.dataset.i], st = x.stufen.splice(+el.dataset.k, 1)[0];
-        if (st && st.id) { MODELLE.delete(st.id); ui.projekt.unterlagen = ui.projekt.unterlagen.filter(u => u.modell !== st.id); }
+        const P = PJ(), x = P.modelle[+el.dataset.i], st = x.stufen.splice(+el.dataset.k, 1)[0];
+        if (st && st.id && !st.alt) { MODELLE.delete(st.id); P.unterlagen = P.unterlagen.filter(u => u.modell !== st.id); }
         render(); break;
       }
       case "p-gruppe-teil": {
-        const g = ui.projekt.baugruppen[+el.dataset.i], m = el.dataset.m;
+        const g = PJ().baugruppen[+el.dataset.i], m = el.dataset.m;
         g.teile = g.teile.includes(m) ? g.teile.filter(x => x !== m) : g.teile.concat(m);
         render(); break;
       }
       case "p-gruppe-weg": {
-        const g = ui.projekt.baugruppen.splice(+el.dataset.i, 1)[0];
-        if (g) { MODELLE.delete(g.id); ui.projekt.unterlagen = ui.projekt.unterlagen.filter(u => u.modell !== g.id); }
+        const P = PJ(), g = P.baugruppen.splice(+el.dataset.i, 1)[0];
+        if (g) { MODELLE.delete(g.id); P.unterlagen = P.unterlagen.filter(u => u.modell !== g.id); }
         render(); break;
       }
+      case "kette-tab": ui.kette.tab = el.dataset.tab; render(); break;
       case "auftragstext": ui.dokVon = ui.blatt === "unterlagen" ? "unterlagen" : null; ui.dokument = "L:" + el.dataset.nr; ui.blatt = "dokument"; ui.blattHoehe = "voll"; render(); break;
       case "kette-auf": oeffneKette(); break;
       case "stufe-zeigen": ui.zielSicht = el.dataset.z === "1"; render(); break;
-      case "kette-werk": ui.kette.liste.push({ uid: null, werkstatt: el.dataset.w, leistung: "" }); ui.kette.waehlen = false; render(); break;
+      case "kette-werk": ui.kette.liste.push({ uid: "S" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), neu: true, werkstatt: el.dataset.w, leistung: "" }); ui.kette.waehlen = false; render(); break;
       case "kette-waehlen": ui.kette.waehlen = !ui.kette.waehlen; render(); break;
       case "kette-hoch": case "kette-runter": {
         const l = ui.kette.liste, i = +el.dataset.i, k = act === "kette-hoch" ? i - 1 : i + 1;
@@ -3656,14 +3762,14 @@ a.btn { text-decoration: none; }
       const [obj, feld] = t.dataset.bind.split(".");
       if (ui[obj]) ui[obj][feld] = t.value;
       if (obj === "antwort") { const b = $("#antwortSenden"); if (b) b.disabled = !(ui.antwort.memo || ui.antwort.text.trim()); }
-    } else if (t.dataset.pm && ui.projekt) {
-      ui.projekt.modelle[+t.dataset.i][t.dataset.pm] = t.value;
-    } else if (t.dataset.pst && ui.projekt) {
-      ui.projekt.modelle[+t.dataset.i].stufen[+t.dataset.k][t.dataset.pst] = t.value;
+    } else if (t.dataset.pm && PJ()) {
+      PJ().modelle[+t.dataset.i][t.dataset.pm] = t.value;
+    } else if (t.dataset.pst && PJ()) {
+      PJ().modelle[+t.dataset.i].stufen[+t.dataset.k][t.dataset.pst] = t.value;
     } else if (t.dataset.ps && ui.projekt) {
       ui.projekt.stationen[+t.dataset.i][t.dataset.ps] = t.value;
-    } else if (t.dataset.pg && ui.projekt) {
-      ui.projekt.baugruppen[+t.dataset.i][t.dataset.pg] = t.value;
+    } else if (t.dataset.pg && PJ()) {
+      PJ().baugruppen[+t.dataset.i][t.dataset.pg] = t.value;
     } else if (t.dataset.kl && ui.kette) {
       ui.kette.liste[+t.dataset.i][t.dataset.kl] = t.value;
     } else if (t.dataset.p && ui.projekt) {
@@ -3674,9 +3780,9 @@ a.btn { text-decoration: none; }
   document.addEventListener("change", e => {
     const t = e.target;
     if (t.dataset.pd && ui.projekt) { ui.projekt.unterlagen[+t.dataset.i][t.dataset.pd] = t.value; return; }
-    if (t.dataset.pm && ui.projekt && t.tagName === "SELECT") { ui.projekt.modelle[+t.dataset.i][t.dataset.pm] = t.value; return; }
-    if (t.dataset.pg && ui.projekt && t.tagName === "SELECT") { ui.projekt.baugruppen[+t.dataset.i][t.dataset.pg] = t.value; return; }
-    if (t.dataset.pst && ui.projekt && t.tagName === "SELECT") { ui.projekt.modelle[+t.dataset.i].stufen[+t.dataset.k][t.dataset.pst] = t.value; return; }
+    if (t.dataset.pm && PJ() && t.tagName === "SELECT") { PJ().modelle[+t.dataset.i][t.dataset.pm] = t.value; return; }
+    if (t.dataset.pg && PJ() && t.tagName === "SELECT") { PJ().baugruppen[+t.dataset.i][t.dataset.pg] = t.value; return; }
+    if (t.dataset.pst && PJ() && t.tagName === "SELECT") { PJ().modelle[+t.dataset.i].stufen[+t.dataset.k][t.dataset.pst] = t.value; return; }
     if (t.id === "leerOk") { const b = $("#freigebenBtn"); if (b) b.disabled = !t.checked; return; }
     if (t.id === "fotoInput" && t.files && t.files[0] && ui.neu) {
       if (ui.neu.foto) URL.revokeObjectURL(ui.neu.foto);
@@ -3684,7 +3790,7 @@ a.btn { text-decoration: none; }
       t.value = ""; render();
     }
     if (t.id === "scanFoto" && t.files && t.files[0]) { const f = t.files[0]; t.value = ""; Scanner.foto(f); return; }
-    if (t.id === "modellInput" && t.files && ui.projekt) {
+    if (t.id === "modellInput" && t.files && PJ()) {
       const dateien = Array.from(t.files);
       t.value = "";
       ladeModelle(dateien);
@@ -4147,7 +4253,7 @@ a.btn { text-decoration: none; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261123115143";
+  const BUILD = "20261123121213";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
