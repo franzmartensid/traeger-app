@@ -13,15 +13,16 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap">
 <style>
 :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 /* Träger-App, Entwurf 3: Inhalt und Funktionen von Entwurf 2, Bildsprache von Entwurf 1.
-   Fassung 2 mit klarer Hierarchie, Farben weiterhin nur aus Entwurf 1:
-   Ebene 0  Grund in --paper
-   Ebene 1  weiße Flächen ohne Rand (Zwilling, Karten, Blatt)
-   Ebene 2  Orange: die eine Haupttaste je Bildschirm, die Station, die jetzt dran ist, die eigene Auswahl
-   Schrift: kleine graue Labels über großem, dunklem Inhalt. Schwarz nur noch für Text und erledigte Stationen. */
+   Fassung 3, nach dem Skill frontend-design, Farben weiterhin nur aus Entwurf 1:
+   Weiß ist nur, was physisch auf dem Träger liegt (Zwilling, Bauteil). Information steht auf --paper, getrennt durch eine Linie.
+   Orange heißt nur noch: hier passiert gerade etwas (Station jetzt, Bauteil in Bearbeitung, in Arbeit, Lieferung).
+   Handlungen, Auswahl und Links in --ink. Radien nach Bedeutung: Bedienelemente 8 px, Felder 6 px, der Träger seine eigene Form.
+   Keine Labels in Großbuchstaben, keine Ketten mit Mittelpunkten: Abschnittstitel in normaler Schreibweise, Felder wie auf einer Laufkarte.
+   Die Regeln dafür stehen gesammelt am Ende der Datei. */
 :root {
   /* Entwurf 1 */
   --paper: #ECEEEF;
@@ -629,6 +630,87 @@ a.btn { text-decoration: none; }
 .verlauf .vrow.nebenher .knoten[class] { background: var(--surface); box-shadow: inset 0 0 0 1.2px var(--line); border: 0; color: var(--soft-grey); font-weight: 500; }
 .verlauf .vrow.nebenher .rest { color: var(--soft-grey); }
 .verlauf .vrow.nebenher .tl-jetzt { color: var(--soft-grey); }
+
+/* =========================================================================
+   Fassung 3: Werkstatt statt Vorlage
+   ========================================================================= */
+:root { --r-flaeche: 8px; --r-taste: 8px; --r-feld: 6px; }
+body { font-variant-numeric: tabular-nums; }
+:focus-visible { outline-color: var(--ink); }
+
+/* Orange nur als Zustand: Handlungen, Auswahl und Links in Tusche */
+.btn.pri { background: var(--ink); color: var(--surface); font-weight: 600; }
+.textbtn, .modus-leiste button { text-decoration-color: currentColor; }
+.anm-knopf, .tcard.neu .plus, .fab .kreisf, .play, .notif .q, .gm-ico { background: var(--ink); }
+.status .ico { background: var(--surface); color: var(--ink); }
+.dokzeile-a .dokic.d3, .dokzeile-a .dokic.d-text { background: var(--row); }
+.punkte i.an { background: var(--ink); }
+.pill.sb-neu, .bglied .pill.st-arbeit { background: var(--placeholder); color: var(--ink); }
+.st-arbeit::before { display: none; }
+.part.sel { fill: var(--part); stroke: var(--ink); }
+.pin.offen .chip { box-shadow: 0 0 0 2.5px var(--surface), 0 0 0 5px var(--ink); }
+.lp circle, .kr-verb, .kr-zeiger { stroke: var(--ink); }
+.kr-stelle { background: var(--ink); }
+.kr-chip.ziel .chip { box-shadow: 0 0 0 3px var(--surface), 0 0 0 6px var(--ink); }
+.bk.eigen span, .bglied.eigen .knoten { box-shadow: inset 0 0 0 2px var(--ink); }
+.bk.gewaehlt span, .bglied.gewaehlt .knoten { background: var(--ink); color: var(--surface); box-shadow: none; }
+.bglied.gewaehlt { background: var(--row); box-shadow: inset 0 0 0 1.6px var(--ink); }
+.bglied .haken { color: var(--ink); }
+.screen.stellenwahl .bwell { box-shadow: 0 0 0 2.5px var(--ink); }
+.feld input:focus, .feld textarea:focus, .feld select:focus, .modellzeile input:focus, .sb-leistung:focus { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.sucher .ecke { border-color: var(--ink); } .sucher .linie { background: var(--ink); }
+.scan-rahmen i { border-color: var(--surface); }
+
+/* Radien nach Bedeutung */
+.btn { border-radius: var(--r-taste); }
+.seg { border-radius: 10px; } .seg button { border-radius: 7px; }
+.modus, .toast, .kr-name, .fotobox .neu-auf, .dbtn, .codekarte, .wahlknopf, .tag, .artpill { border-radius: 6px; }
+.pill, .tl-jetzt { border-radius: 4px; }
+.artpill.gross, .rueck, .memozeile, .anm-knopf, .mit, .bezug, .bglied, .kachel { border-radius: 8px; }
+.modus-leiste, .notif { border-radius: 10px; }
+.gm-karte { border-radius: 12px; }
+.sheet { border-radius: 14px 14px 0 0; }
+.feld textarea, .feld input, .feld select, .klein-feld select, .dokzeile select, .dokzeile input, .modellzeile input, .sb-leistung { border-radius: var(--r-feld); }
+.mini-btn, .rundknopf, .scan-auf span, .demo-auf span, .dok-laden, .dok-laden::before, .scan-zu { border-radius: 8px; }
+.hinweiszeile, .drei div, .fotobox, .foto-gross, .dok-bild, .dok-pdf, .dok-text, .sucher, .mini, .dokzeile-a .dokic, .modellzeile .vorschau, .vorschau.klein { border-radius: 6px; }
+.dokic.gross { border-radius: 10px; }
+
+/* Schrift: Barlow für Text, Barlow Semi Condensed für Titel und die Kennung des Trägers */
+.titel, .btitel, .tid, .gm-karte h2, .scan-titel, .demo h1, .bezug .gross, .peek-row .ktitel { font-family: "Barlow Semi Condensed", var(--font); letter-spacing: 0; }
+.titel { font-size: 32px; }
+
+/* Labels in normaler Schreibweise; am Anfang einer Karte sind sie Abschnittstitel */
+.beschr, .karte > h2.ktitel:first-child, .hero .oben, .bezug .oben p, .scan-wer, .fab .lab, .tl-jetzt, .werk { text-transform: none; letter-spacing: 0; }
+.beschr { font: 600 13px/1.3 var(--font); color: var(--grey); }
+.demo > div:first-child .beschr { letter-spacing: 0; }
+.karte > h2.ktitel:first-child, .karte > p.beschr:first-child { font: 600 17px/1.3 var(--font); color: var(--ink); }
+.feld > .beschr { font: 500 15px/1.3 var(--font); color: var(--ink); }
+.tl-jetzt { font: 600 13px/18px var(--font); }
+.hero .oben { font: 500 15px/1.3 var(--font); color: var(--grey); }
+.werk { font: 500 16px/1.3 var(--font); color: var(--ink); }
+
+/* Kopf: erst was, dann wer, dann die Felder der Laufkarte */
+.kopf-l > .titel { order: 1; }
+.kopf-l > .werk { order: 2; margin: 2px 0 0; }
+.kopf-l > .neben { order: 3; margin-top: 6px; }
+.lk { white-space: nowrap; margin-right: 14px; }
+.lk-n { font: 400 14px/1.3 var(--font); color: var(--grey); }
+.lk-w { font: 600 15px/1.3 var(--font); color: var(--ink); }
+
+/* Information auf dem Papier, getrennt durch eine Linie */
+.flaeche > .karte { background: transparent; border-radius: 0; padding: 16px 4px 6px; border-top: 1px solid var(--line); margin: 8px 0 0; }
+.flaeche > .status { background: transparent; border-radius: 0; padding: 0 4px 14px; margin: 0; }
+.flaeche .dokzeile-a .dokic { background: var(--surface); }
+.flaeche .verlauf .vrow .knoten.n-offen, .flaeche .verlauf .vrow.nebenher .knoten[class] { background: var(--paper); }
+.sheet .karte { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 14px 0 6px; background: transparent; }
+
+/* Der Zwilling ist der Träger: Rand des Tabletts, vorne die Kennung */
+.twin { border-radius: 12px 12px 3px 3px; box-shadow: inset 0 0 0 5px var(--placeholder); }
+.twin[data-kennung] { margin-bottom: 40px; }
+.twin[data-kennung]::after { content: attr(data-kennung); position: absolute; left: 0; right: 0; top: 100%; height: 22px; border-radius: 0 0 10px 10px;
+  background: var(--placeholder); color: var(--grey); text-align: center; font: 600 12px/22px "Barlow Semi Condensed", var(--font); letter-spacing: .06em; pointer-events: none; }
+.twin.traeger-sel, .screen.stellenwahl .twin { box-shadow: inset 0 0 0 5px var(--placeholder), 0 0 0 2.5px var(--ink); }
+.bwell { border-radius: 12px; }
 </style>
 </head>
 <body>
@@ -1238,7 +1320,7 @@ a.btn { text-decoration: none; }
   const werkVon = (a, nr) => { const s = st(a, nr); return s ? WERK[s.werkstatt] : null; };
   const rolleVon = (a, nr) => (nr === 0 || nr === ende(a) ? "AG" : (st(a, nr) || {}).werkstatt || null);
   const kurzName = (a, nr) => (nr === 0 ? "Auftraggeber" : nr === ende(a) ? "Rückkehr" : `Station ${nr}`);
-  const langName = (a, nr) => (nr === 0 ? "Auftraggeber" : nr === ende(a) ? "Rückkehr" : `Station ${nr} · ${werkVon(a, nr).verfahren}`);
+  const langName = (a, nr) => (nr === 0 ? "Auftraggeber" : nr === ende(a) ? "Rückkehr" : `Station ${nr}, ${werkVon(a, nr).verfahren}`);
   const knotenText = (a, nr) => (nr === 0 || nr === ende(a) ? "A" : String(nr));
   const vonTxt = (a, nr) => (nr === 0 ? "vom Auftraggeber" : `von Station ${nr}`);
   const fuerTxt = (a, nr) => (nr === 0 ? "Für den Auftraggeber" : `Für Station ${nr}`);
@@ -1259,6 +1341,10 @@ a.btn { text-decoration: none; }
     ? { titel: "Auftraggeber", name: AUFTRAGGEBER.name, adresse: AUFTRAGGEBER.adresse }
     : { titel: langName(a, nr), name: werkVon(a, nr).name, adresse: werkVon(a, nr).adresse });
   const bauteilName = (a, id) => (id ? (a.bauteile.find(b => b.id === id) || {}).name || "" : "Träger");
+  /* Bezug einer neuen Anmerkung in ganzen Worten, passend für jeden Namen */
+  const zuBauteil = (a, id) => { const b = id && a.bauteile.find(x => x.id === id); return !b ? "zum Träger" : `${b.art === "baugruppe" ? "zur Baugruppe" : "zum Bauteil"} ${esc(b.name)}`; };
+  /* Feld wie auf einer Laufkarte: Name grau, Wert kräftig */
+  const feld = (n, w) => `<span class="lk"><span class="lk-n">${n}</span> <span class="lk-w">${esc(String(w))}</span></span>`;
   const findAnm = (a, id) => a.anmerkungen.find(x => x.id === id);
   const stUid = (a, uid) => a.stationen.find(q => q.uid === uid);
   /* Ein Bauteil ist vorhanden, wenn es beim Auftraggeber beiliegt oder seine Station abgeschlossen ist (Stand bei Station v) */
@@ -1348,14 +1434,14 @@ a.btn { text-decoration: none; }
   function entstehungText(a, b) {
     if (b.art === "baugruppe") {
       const q = stUid(a, b.entsteht), teile = b.teile.map(id => bauteilName(a, id)).join(", ");
-      return `Baugruppe aus ${teile} · ${q ? (vorhanden(a, b, jetzt(a)) ? "gefügt bei " : "wird gefügt bei ") + kurzName(a, q.nr) : ""}`;
+      return `Baugruppe aus ${teile}${q ? (vorhanden(a, b, jetzt(a)) ? ", gefügt bei " : ", wird gefügt bei ") + kurzName(a, q.nr) : ""}`;
     }
     const g = gruppeVon(a, b), gq = g && stUid(a, g.entsteht);
-    const fuegen = g && gq ? ` · ${vorhanden(a, g, jetzt(a)) ? "gefügt" : "wird gefügt"} bei ${kurzName(a, gq.nr)} mit ${g.teile.filter(id => id !== b.id).map(id => bauteilName(a, id)).join(", ")} zu „${g.name}“` : "";
+    const fuegen = g && gq ? `, ${vorhanden(a, g, jetzt(a)) ? "gefügt" : "wird gefügt"} bei ${kurzName(a, gq.nr)} mit ${g.teile.filter(id => id !== b.id).map(id => bauteilName(a, id)).join(", ")} zu „${g.name}“` : "";
     if (!b.entsteht || b.entsteht === "AG") return "Vom Auftraggeber beigelegt" + fuegen;
     const q = stUid(a, b.entsteht);
     if (!q) return fuegen.slice(3);
-    return (vorhanden(a, b, jetzt(a)) ? "Gefertigt bei " : "Entsteht bei ") + kurzName(a, q.nr) + " · " + WERK[q.werkstatt].verfahren + fuegen;
+    return (vorhanden(a, b, jetzt(a)) ? "Gefertigt bei " : "Entsteht bei ") + kurzName(a, q.nr) + " (" + WERK[q.werkstatt].verfahren + ")" + fuegen;
   }
 
   /* Wo der Träger gerade ist („jetzt“ auf der Zeitleiste) */
@@ -1465,7 +1551,7 @@ a.btn { text-decoration: none; }
     if (a.zurueck) return "Zurück beim Auftraggeber";
     if (a.logistik) {
       const zu = a.logistik.nach === ende(a) ? "zum Auftraggeber" : `zu Station ${a.logistik.nach}`;
-      return `Lieferung ${zu}${a.logistik.ankunft ? " · " + a.logistik.ankunft : ""}`;
+      return `Lieferung ${zu}${a.logistik.ankunft ? ", " + a.logistik.ankunft : ""}`;
     }
     const j = jetzt(a);
     return j === 0 ? "beim Auftraggeber" : `Station ${j} von ${anzahl(a)}`;
@@ -1554,7 +1640,7 @@ a.btn { text-decoration: none; }
       ? `<button class="tcard neu" type="button" data-act="projekt-neu"><span class="plus"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16" style="stroke:var(--card)" stroke-width="3" stroke-linecap="round"/></svg></span><span class="ktitel">Neues Projekt</span></button>`
       : "";
     const wer = state.ich === "AG" ? AUFTRAGGEBER.name : WERK[state.ich].name;
-    return `<div class="head"><div class="kopf-l"><p class="werk">${ICO.werk} ${esc(wer)}</p><h1 class="titel">Alle Träger</h1>
+    return `<div class="head"><div class="kopf-l"><p class="werk">${esc(wer)}</p><h1 class="titel">Alle Träger</h1>
       <p class="neben">${liste.length ? `${liste.length} Auftr${liste.length === 1 ? "ag" : "äge"} im Netzwerk` : "Keine Aufträge"}</p></div></div>
       <div class="raster">${neuKarte}${karten}</div><div class="platz"></div>`;
   }
@@ -1562,13 +1648,13 @@ a.btn { text-decoration: none; }
   /* Kopf auf „Träger, jetzt“. Änderung 7: Name der Werkstatt steht oben. */
   function kopfTraeger(a) {
     if (state.ich === "AG") {
-      return `<div class="head"><div class="kopf-l"><p class="werk">${ICO.werk} ${esc(AUFTRAGGEBER.name)}</p>
-        <h1 class="titel">${esc(a.titel)}</h1><p class="neben">${a.id} · Träger ${a.traeger}</p></div><div class="kopf-r">${pillAuftrag(a)}</div></div>`;
+      return `<div class="head"><div class="kopf-l"><p class="werk">${esc(AUFTRAGGEBER.name)}</p>
+        <h1 class="titel">${esc(a.titel)}</h1><p class="neben">${feld("Auftrag", a.id)}</p></div><div class="kopf-r">${pillAuftrag(a)}</div></div>`;
     }
     const me = meinNr(a), s = st(a, me), w = WERK[s.werkstatt];
     const pill = s.status === "in-arbeit" && wartet(a, me) ? `<span class="pill st-wartet">Wartet auf Antwort</span>` : statusPill(s.status);
-    return `<div class="head"><div class="kopf-l"><p class="werk">${ICO.werk} ${esc(w.name)}</p>
-      <h1 class="titel">${esc(w.verfahren)}</h1><p class="neben">${a.id} · Station ${me} von ${anzahl(a)}</p></div><div class="kopf-r">${pill}</div></div>`;
+    return `<div class="head"><div class="kopf-l"><p class="werk">${esc(w.name)}</p>
+      <h1 class="titel">${esc(w.verfahren)}</h1><p class="neben">${feld("Auftrag", a.id)}${feld("Station", `${me} von ${anzahl(a)}`)}</p></div><div class="kopf-r">${pill}</div></div>`;
   }
 
   /* Änderung 1 und 2: Abschluss und Lieferung bleiben sichtbar */
@@ -1578,18 +1664,18 @@ a.btn { text-decoration: none; }
       if (!L) return "";
       const zu = ort(a, L.nach);
       return `<div class="status lieferung"><span class="ico">${ICO.lkw(22)}</span><div><p class="t">Lieferung an ${esc(zu.titel === "Auftraggeber" ? "Sie" : zu.titel)}</p>
-        <p class="u">${esc(logistikStand(L))}${zu.titel === "Auftraggeber" ? "" : " · " + esc(zu.name)}</p></div></div>`;
+        <p class="u">${esc(logistikStand(L))}${zu.titel === "Auftraggeber" ? "" : ", " + esc(zu.name)}</p></div></div>`;
     }
     const me = meinNr(a);
     if (me == null) return "";
     const s = st(a, me);
     if (s.status === "abgeschlossen" && L && L.von === me) {
       const zu = ort(a, L.nach);
-      return `<div class="status fertig"><span class="ico">${ICO.lkw(22)}</span><div><p class="t">Abgeschlossen · Logistik ist benachrichtigt</p>
-        <p class="u">${esc(logistikStand(L))} · Ziel: ${esc(zu.titel === "Auftraggeber" ? "Auftraggeber" : zu.titel + ", " + zu.name)}</p></div></div>`;
+      return `<div class="status fertig"><span class="ico">${ICO.lkw(22)}</span><div><p class="t">Abgeschlossen, Logistik ist benachrichtigt</p>
+        <p class="u">${esc(logistikStand(L))}, Ziel: ${esc(zu.titel === "Auftraggeber" ? "Auftraggeber" : zu.titel + ", " + zu.name)}</p></div></div>`;
     }
     if (s.status === "lieferung") {
-      return `<div class="status lieferung"><span class="ico">${ICO.lkw(22)}</span><div><p class="t">Lieferung · Der Träger ist unterwegs zu Ihnen</p>
+      return `<div class="status lieferung"><span class="ico">${ICO.lkw(22)}</span><div><p class="t">Der Träger ist unterwegs zu Ihnen</p>
         <p class="u">${L ? esc(logistikStand(L)) : "Noch nicht abgeholt"}</p></div></div>`;
     }
     return "";
@@ -1605,15 +1691,15 @@ a.btn { text-decoration: none; }
     const j = jetzt(a), v = ansicht(a), rueck = v < j;
     let kopf;
     if (ui.kreismenue || ui.modus) {
-      kopf = `<div class="head"><div class="kopf-l"><p class="neben">Neue Anmerkung${ui.kreismenue ? " · " + esc(bauteilName(a, ui.kreismenue.bauteil)) : ""}</p><h1 class="titel">${ui.modus ? "Stelle wählen" : "Art wählen"}</h1></div></div>`;
+      kopf = `<div class="head"><div class="kopf-l"><p class="neben">Neue Anmerkung${ui.kreismenue ? " " + zuBauteil(a, ui.kreismenue.bauteil) : ""}</p><h1 class="titel">${ui.modus ? "Stelle wählen" : "Art wählen"}</h1></div></div>`;
     } else if (rueck) {
-      kopf = `<div class="rueck"><span>Rückblick · ${esc(langName(a, v))}</span><button type="button" data-act="jetzt" aria-label="Zurück ins Jetzt">×</button></div>`;
+      kopf = `<div class="rueck"><span>Rückblick auf ${esc(langName(a, v))}</span><button type="button" data-act="jetzt" aria-label="Zurück ins Jetzt">×</button></div>`;
     } else {
       kopf = kopfTraeger(a) + statusZeile(a);
     }
     const pins = a.anmerkungen.filter(x => !rueck || x.von <= v).map(x => { const q = pinPos(a, x, v); return q ? pinHtml(a, x, q) : ""; }).join("");
     const traegerSel = ui.kreismenue && !ui.kreismenue.bauteil ? " traeger-sel" : "";
-    const twin = `<div class="twin${traegerSel}" id="twin" data-twin="traeger" role="group" aria-label="Zwilling des Trägers ${a.traeger}">${zwillingSvg(a, ui.kreismenue && ui.kreismenue.bauteil, v, zeigtZiel(a) && v === j)}${pins}</div>`;
+    const twin = `<div class="twin${traegerSel}" id="twin"${a.traeger ? ` data-kennung="${esc(a.traeger)}"` : ""} data-twin="traeger" role="group" aria-label="Zwilling des Trägers ${a.traeger}">${zwillingSvg(a, ui.kreismenue && ui.kreismenue.bauteil, v, zeigtZiel(a) && v === j)}${pins}</div>`;
     let unten;
     if (ui.kreismenue) {
       unten = "";
@@ -1621,7 +1707,7 @@ a.btn { text-decoration: none; }
       unten = "";
     } else if (rueck) {
       const liste = a.anmerkungen.filter(x => x.von === v);
-      const zeilen = liste.map(x => `<button class="zeile" type="button" data-act="pin" data-id="${x.id}">${chip(x.art, "s")}<span class="rest"><span class="text">${ARTEN[x.art].name} · ${esc(bauteilName(a, x.bauteil))}</span></span>${ungelesen(a, x) ? '<i class="dot"></i>' : ""}</button>`).join("");
+      const zeilen = liste.map(x => `<button class="zeile" type="button" data-act="pin" data-id="${x.id}">${chip(x.art, "s")}<span class="rest"><span class="text">${ARTEN[x.art].name}, ${esc(bauteilName(a, x.bauteil))}</span></span>${ungelesen(a, x) ? '<i class="dot"></i>' : ""}</button>`).join("");
       unten = `<section class="karte" style="margin-top:12px"><h2 class="ktitel">In ${kurzName(a, v)} entstanden</h2>
           ${zeilen || '<p class="leer">Hier ist keine Anmerkung entstanden.</p>'}
           <button class="textbtn" type="button" data-act="unterlagen-von" data-nr="${v}">Unterlagen von ${kurzName(a, v)} ›</button></section>
@@ -1697,9 +1783,9 @@ a.btn { text-decoration: none; }
     const zeilen = verlaufVon(a, b).map(nr => {
       const chips = a.anmerkungen.filter(x => x.bauteil === b.id && x.von === nr).map(x => chip(x.art, "s")).join("");
       const nebenher = !betrifft(a, b, st(a, nr));
-      return `<button class="vrow${nebenher ? " nebenher" : ""}" type="button" data-act="rueckblick" data-nr="${nr}" aria-label="${kurzName(a, nr)} · ${esc(werkVon(a, nr).verfahren)}${nebenher ? ", betrifft dieses Bauteil nicht" : ""}">
+      return `<button class="vrow${nebenher ? " nebenher" : ""}" type="button" data-act="rueckblick" data-nr="${nr}" aria-label="${kurzName(a, nr)}, ${esc(werkVon(a, nr).verfahren)}${nebenher ? ", betrifft dieses Bauteil nicht" : ""}">
         <span class="knoten ${knotenKlasse(a, nr, j)}">${nr}</span>
-        <span class="rest text">${kurzName(a, nr)} · ${esc(werkVon(a, nr).verfahren)}</span>
+        <span class="rest text">${esc(werkVon(a, nr).verfahren)}</span>
         ${nr === j ? '<span class="tl-jetzt" style="position:static;transform:none">jetzt</span>' : ""}
         <span class="chips">${chips}</span></button>`;
     }).join("");
@@ -1713,7 +1799,7 @@ a.btn { text-decoration: none; }
       ${b.form === "modell"
         ? `<div class="bwell-rahmen"><div class="bwell b3d${ziel && ui.zielSicht ? " ziel-sicht" : ""}" id="slot3d" data-twin="bauteil3d" data-bt="${b.id}" data-modell="${gezeigt.modell}" data-bild="${gk}" role="group" aria-label="3D-Modell ${esc(b.name)}${ziel && ui.zielSicht ? ", nach der Bearbeitung" : ""}">${pins3d}</div>${anmKnopf}</div>`
         : `<div class="bwell-rahmen"><div class="bwell"><div class="bpart${b.form === "rund" ? " rund" : ""}" id="bpart" data-twin="bauteil" style="aspect-ratio:${verhaeltnis};${groesse}">${pins}</div></div>${anmKnopf}</div>`}
-      <section class="karte"><h2 class="ktitel">Verlauf dieses Bauteils</h2><div class="verlauf">${zeilen}</div></section>
+      <section class="karte"><h2 class="ktitel">Verlauf</h2><div class="verlauf">${zeilen}</div></section>
       <section class="karte"><h2 class="ktitel">Unterlagen</h2>${dokZeilen(doks) || '<p class="leer">Keine Unterlagen</p>'}</section>
       <div class="platz"></div>`;
   }
@@ -1745,9 +1831,9 @@ a.btn { text-decoration: none; }
         <section class="karte"><p class="beschr">Stand</p><div class="drei">${drei}</div></section>${taste}`;
     }
     const andere = aktiv.filter(q => q !== a).map(q => `<button class="zeile" type="button" data-act="log-waehle" data-id="${q.id}">
-        <span class="rest"><span class="ktitel">Träger ${q.traeger} · ${q.id}</span><span class="neben">${esc(ort(q, q.logistik.von).name)} → ${esc(ort(q, q.logistik.nach).name)}</span></span>${statusPill("lieferung")}</button>`).join("");
+        <span class="rest"><span class="ktitel">Träger ${q.traeger}, Auftrag ${q.id}</span><span class="neben">${esc(ort(q, q.logistik.von).name)} → ${esc(ort(q, q.logistik.nach).name)}</span></span>${statusPill("lieferung")}</button>`).join("");
     return `<div class="head"><div class="kopf-l"><p class="werk">${ICO.lkw(18)} ${esc(LOGISTIK.name)}</p><h1 class="titel">Träger ${a.traeger}</h1>
-        <p class="neben">Auftrag ${a.id} · ${esc(a.titel)}</p></div></div>
+        <p class="neben">${feld("Auftrag", a.id)}${esc(a.titel)}</p></div></div>
       ${inhalt}
       ${andere ? `<section class="karte" style="margin-top:12px"><h2 class="ktitel">Weitere Abholungen</h2>${andere}</section>` : ""}<div class="platz"></div>`;
   }
@@ -1771,7 +1857,7 @@ a.btn { text-decoration: none; }
     const antw = a.anmerkungen.filter(x => antwortUngelesen(a, x)).length;
     const rechts = (offen ? chip("frage", "s") : "") + (antw ? `<span class="antw">${antw} Antwort <i class="dot"></i></span>` : "");
     return `<div class="grip" data-grip="peek" role="button" tabindex="0" aria-label="Auftrag und Unterlagen öffnen"><i class="griff"></i>
-      <div class="peek-row"><div><p class="ktitel">Auftrag · Unterlagen</p><p class="neben">${teile.join(" · ")}</p></div><div class="peek-r">${rechts}</div></div></div>`;
+      <div class="peek-row"><div><p class="ktitel">Auftrag und Unterlagen</p><p class="neben">${teile.join(", ")}</p></div><div class="peek-r">${rechts}</div></div></div>`;
   }
 
   function blattUnterlagen(a) {
@@ -1779,7 +1865,7 @@ a.btn { text-decoration: none; }
     const me = meinNr(a);
     let nr = nurLesen ? ui.unterlagenVon : me;
     if (state.ich === "AG" && !nurLesen) nr = klemme(jetzt(a), 1, anzahl(a));
-    const kopf = `<div class="blatt-kopf"><p class="neben">${a.id} · ${esc(a.titel)}${nurLesen ? " · nur lesen" : ""}</p></div>`;
+    const kopf = `<div class="blatt-kopf"><p class="neben">${feld("Auftrag", a.id)}${esc(a.titel)}${nurLesen ? " (nur lesen)" : ""}</p></div>`;
     if (state.ich === "AG" && a.zurueck && !nurLesen) {
       const zeilen = a.stationen.map(s => {
         const n = a.anmerkungen.filter(x => x.bezug === s.nr).length;
@@ -1798,7 +1884,7 @@ a.btn { text-decoration: none; }
     const s = st(a, nr), w = WERK[s.werkstatt];
     const istMeine = istWerk() && nr === me;
     const hero = `<section class="hero"><p class="oben">Station ${nr} von ${anzahl(a)}</p><h2 class="titel">${esc(w.verfahren)}</h2>
-      <p class="neben">nach DIN 8580 · Hauptgruppe ${w.hg}</p><p class="werk">${ICO.werk} ${istMeine ? "Ihre Werkstatt: " : ""}${esc(w.name)}</p></section>`;
+      <p class="neben">nach DIN 8580, Hauptgruppe ${w.hg}</p><p class="werk">${istMeine ? "Ihre Werkstatt: " : ""}${esc(w.name)}</p></section>`;
     // Drei Zustände der Station
     const reihenfolge = ["lieferung", "in-arbeit", "abgeschlossen"];
     const ix = reihenfolge.indexOf(s.status);
@@ -1814,7 +1900,7 @@ a.btn { text-decoration: none; }
     const docs = a.unterlagen.filter(u => u.station == null || u.station === nr);
     const textZeile = state.ich === "AG" || rolleVon(a, nr) === state.ich
       ? `<div class="zeile dokzeile-a"><button class="dok-auf" type="button" data-act="auftragstext" data-nr="${nr}"><span class="dokic d-text">${ICO.dok}</span>
-          <span class="rest"><span class="text">Auftragstext</span><span class="neben">Leistung · ${kurzName(a, nr)}</span></span></button></div>` : "";
+          <span class="rest"><span class="text">Auftragstext</span><span class="neben">Leistung für ${kurzName(a, nr)}</span></span></button></div>` : "";
     const auftrag = "";
     const unterlagen = `<section class="karte"><h2 class="ktitel">Unterlagen</h2>${textZeile}${dokZeilen(docs) || (textZeile ? "" : '<p class="leer">Keine Unterlagen für diese Station</p>')}</section>`;
     // Offene Fragen
@@ -1824,7 +1910,7 @@ a.btn { text-decoration: none; }
     });
     a.anmerkungen.filter(x => x.art === "frage" && !x.offen && rolleVon(a, x.von) === state.ich && x.antworten.length).forEach(x => {
       const neu = antwortUngelesen(a, x);
-      fragen.push(`<button class="zeile" type="button" data-act="pin" data-id="${x.id}">${chip("frage", "s")}<span class="rest"><span class="text">Ihre Frage · ${x.antworten.length} Antwort</span></span>${neu ? '<i class="dot"></i>' : ""}</button>`);
+      fragen.push(`<button class="zeile" type="button" data-act="pin" data-id="${x.id}">${chip("frage", "s")}<span class="rest"><span class="text">Ihre Frage, ${x.antworten.length} Antwort</span></span>${neu ? '<i class="dot"></i>' : ""}</button>`);
     });
     const fragenKarte = `<section class="karte"><h2 class="ktitel">Offene Fragen</h2>${fragen.join("") || '<p class="leer">Keine offenen Fragen.</p>'}</section>`;
     // Abholung und Code: Änderung 1 und 2
@@ -1835,11 +1921,11 @@ a.btn { text-decoration: none; }
       const reihe = [["Logistik benachrichtigt", L.zeit], ["Abgeholt", L.abgeholt], ["Zugestellt", L.zugestellt]]
         .map(([n, z]) => `<div class="zeile">${z ? `<span style="color:var(--ink)">${ICO.haken}</span>` : '<span style="width:18px"></span>'}<span class="rest text">${n}</span><span class="neben">${z ? fmt(z) : "offen"}</span></div>`).join("");
       abholung = `<section class="karte"><h2 class="ktitel">Abholung</h2>${reihe}
-        <p class="hinweiszeile" style="margin:4px 0 0">Code am Träger · Ziel: ${esc(zu.titel === "Auftraggeber" ? "Auftraggeber" : zu.titel)}, ${esc(zu.name)}, ${esc(zu.adresse)}</p></section>`;
+        <p class="hinweiszeile" style="margin:4px 0 0">Ziel laut Code am Träger: ${esc(zu.titel === "Auftraggeber" ? "Auftraggeber" : zu.titel)}, ${esc(zu.name)}, ${esc(zu.adresse)}</p></section>`;
     } else if (s.status === "lieferung") {
       abholung = `<section class="karte"><h2 class="ktitel">Lieferung</h2><p class="neben">${L ? esc(logistikStand(L)) : "Noch nicht abgeholt"}</p></section>`;
     } else abholung = "";
-    const empfang = s.empfang ? `<p class="neben" style="margin:0 0 12px">✓ Empfang bestätigt beim Scan · ${fmt(s.empfang)}</p>` : "";
+    const empfang = s.empfang ? `<p class="neben" style="margin:0 0 12px">✓ Empfang beim Scan bestätigt, ${fmt(s.empfang)}</p>` : "";
     const uebernehmen = state.ich === "AG" && a.zurueck && !a.abgeschlossen
       ? `<div class="fusszeile"><button class="btn pri block" type="button" data-act="uebernehmen">In Unterlagen übernehmen</button></div>` : "";
     return { kopf, body: hero + statusKarte + abholung + auftrag + unterlagen + fragenKarte + empfang + uebernehmen };
@@ -1847,7 +1933,7 @@ a.btn { text-decoration: none; }
 
   function blattNeu(a) {
     const d = ui.neu, me = meinNr(a);
-    const kopf = `<div class="blatt-kopf"><p class="neben">Neue Anmerkung · ${esc(bauteilName(a, d.bauteil))}</p>
+    const kopf = `<div class="blatt-kopf"><p class="neben">Neue Anmerkung ${zuBauteil(a, d.bauteil)}</p>
       <button class="zeile" type="button" data-act="zur-art" style="padding:0;min-height:44px" aria-label="Art ändern, jetzt ${ARTEN[d.art].name}">${chip(d.art, "m")}<span class="btitel">${ARTEN[d.art].name}</span></button></div>`;
     const foto = d.foto ? `<div class="fotobox"><img id="fotoImg" src="${d.foto}" alt="Foto zur Anmerkung"><canvas id="markcanvas" aria-label="Stelle auf dem Foto markieren"></canvas>
         <button class="neu-auf" type="button" data-act="foto">neu aufnehmen</button></div>` : "";
@@ -1861,7 +1947,7 @@ a.btn { text-decoration: none; }
     for (let nr = 0; nr < ende(a); nr++) {
       const ok = erlaubt(a, d.art, nr, me), eigen = nr === me && me !== 0, gew = d.bezug === nr;
       const titel = nr === 0 ? "Auftraggeber" : werkVon(a, nr).verfahren;
-      const unter = nr === 0 ? AUFTRAGGEBER.name : `Station ${nr} · ${werkVon(a, nr).name}`;
+      const unter = nr === 0 ? AUFTRAGGEBER.name : werkVon(a, nr).name;
       glieder.push(`<button class="bglied${gew ? " gewaehlt" : ""}${eigen ? " eigen" : ""}" type="button" data-act="bezug" data-nr="${nr}" ${ok ? "" : "disabled"} aria-pressed="${gew}">
         <span class="knoten">${knotenText(a, nr)}</span>
         <span class="rest"><span class="ktitel">${esc(titel)}</span><span class="neben">${esc(unter)}</span></span>
@@ -1884,7 +1970,7 @@ a.btn { text-decoration: none; }
   const DATEIEN = new Map();
   const dokZeilen = docs => docs.map(u => `<div class="zeile dokzeile-a">
       <button class="dok-auf" type="button" data-act="dok" data-id="${u.id}"><span class="dokic${u.modell ? " d3" : ""}">${u.modell ? ICO.modell : ICO.dok}</span>
-        <span class="rest"><span class="text">${esc(u.name)}</span><span class="neben">${esc(u.art)} · Index ${esc(u.index)}${u.groesse ? " · " + groesse(u.groesse) : ""}</span></span></button>
+        <span class="rest"><span class="text">${esc(u.name)}</span><span class="neben">${esc(u.art)}, Index ${esc(u.index)}${u.groesse ? ", " + groesse(u.groesse) : ""}</span></span></button>
       ${ladenKnopf(u)}</div>`).join("");
   /* Herunterladen: alle Beteiligten können jede Unterlage als Datei sichern, auch 3D-Modelle.
      Die Datei wird vorab aus dem Speicher geholt, damit der Link beim Antippen sofort bereitsteht. */
@@ -1954,12 +2040,12 @@ a.btn { text-decoration: none; }
     const q = st(a, nr);
     if (!q) return { kopf: "", body: "" };
     const w = WERK[q.werkstatt];
-    const inhalt = [`Auftragstext · ${a.id} · ${a.titel}`, `${kurzName(a, nr)} · ${w.verfahren} · ${w.name}`, "", "Leistung", q.leistung || "–", "",
+    const inhalt = [`Auftragstext zu Auftrag ${a.id}: ${a.titel}`, `${kurzName(a, nr)}, ${w.verfahren} bei ${w.name}`, "", "Leistung", q.leistung || "–", "",
       `Stückzahl: ${a.auftrag.stueckzahl}`, `Termin: ${fmtDatum(a.auftrag.termin)}`, `Hinweise: ${a.auftrag.hinweise || "Keine"}`].join("\n");
     if (!TEXT_URL.has(inhalt)) TEXT_URL.set(inhalt, URL.createObjectURL(new Blob([inhalt], { type: "text/plain;charset=utf-8" })));
     const kopf = `<div class="blatt-kopf"><div class="kopfzeile"><button class="rundknopf" type="button" data-act="dok-zurueck" aria-label="Zurück">${ICO.zurueck}</button>
         <span class="btitel dok-titel">Auftragstext</span></div>
-      <p class="neben">${kurzName(a, nr)} · ${esc(w.verfahren)} · ${esc(w.name)}</p></div>`;
+      <p class="neben">${kurzName(a, nr)}, ${esc(w.verfahren)} bei ${esc(w.name)}</p></div>`;
     const body = `<section class="karte"><h2 class="ktitel">Leistung</h2><p class="text leistung-text">${esc(q.leistung || "Keine Leistung angegeben.")}</p></section>
       <section class="karte"><h2 class="ktitel">Auftrag</h2>
         <div class="zeile"><span class="rest neben">Stückzahl</span><span class="text">${a.auftrag.stueckzahl}</span></div>
@@ -1974,7 +2060,7 @@ a.btn { text-decoration: none; }
     if (!u) return { kopf: "", body: "" };
     const kopf = `<div class="blatt-kopf"><div class="kopfzeile"><button class="rundknopf" type="button" data-act="dok-zurueck" aria-label="Zurück">${ICO.zurueck}</button>
         <span class="btitel dok-titel">${esc(u.name)}</span></div>
-      <p class="neben">${esc(u.art)} · Index ${esc(u.index)}${u.groesse ? " · " + groesse(u.groesse) : ""}</p></div>`;
+      <p class="neben">${esc(u.art)}, Index ${esc(u.index)}${u.groesse ? ", " + groesse(u.groesse) : ""}</p></div>`;
     if (!u.ablage) return { kopf, body: `<p class="hinweiszeile">Die Datei liegt nicht auf diesem Gerät.</p>` };
     const d = DATEIEN.get(u.ablage);
     if (d === undefined) {
@@ -2002,8 +2088,8 @@ a.btn { text-decoration: none; }
     const autor = x.von === 0 ? AUFTRAGGEBER.name : werkVon(a, x.von).name;
     const kopf = `<div class="blatt-kopf"><div class="kopfzeile"><button class="rundknopf" type="button" data-act="blatt-zu" aria-label="Zurück zur Fläche">${ICO.zurueck}</button>
         <span class="artpill gross a-${x.art}">${chip(x.art, "s")}${ARTEN[x.art].name}</span></div>
-      <p class="neben">${kurzName(a, x.von)} → ${x.bezug === x.von ? "eigene Station" : kurzName(a, x.bezug)} · ${esc(bauteilName(a, x.bauteil))}</p>
-      <p class="neben">${fmt(x.zeit)} · ${esc(autor)}</p></div>`;
+      <p class="neben">${kurzName(a, x.von)} → ${x.bezug === x.von ? "eigene Station" : kurzName(a, x.bezug)}, ${esc(bauteilName(a, x.bauteil))}</p>
+      <p class="neben">${fmt(x.zeit)}, ${esc(autor)}</p></div>`;
     if (!ok) {
       return { kopf, body: `<p class="hinweiszeile">Nur für die Beteiligten sichtbar.</p><div class="fusszeile"><button class="btn umriss block" type="button" data-act="blatt-zu">Schließen</button></div>` };
     }
@@ -2011,7 +2097,7 @@ a.btn { text-decoration: none; }
     const memo = x.dauer ? memoZeile(x.dauer, "anm:" + x.id) : "";
     const abschrift = x.abschrift ? `<p class="beschr" style="margin:6px 0 4px">Abschrift</p><p class="text" style="margin:0 0 12px">${esc(x.abschrift)}</p>` : "";
     const sprech = x.heisstFuer ? `<div class="sprech">${fuerTxt(a, x.bezug)} heißt das: ${esc(x.heisstFuer)}</div>` : "";
-    const antworten = x.antworten.map((t, i) => `<section class="karte klein"><p class="beschr">Antwort ${vonTxt(a, t.von)}${t.von === 0 ? "" : " · " + esc(werkVon(a, t.von).name)} · ${fmt(t.zeit)}</p>
+    const antworten = x.antworten.map((t, i) => `<section class="karte klein"><p class="beschr">Antwort ${vonTxt(a, t.von)}${t.von === 0 ? "" : ", " + esc(werkVon(a, t.von).name)}, ${fmt(t.zeit)}</p>
         ${t.dauer ? memoZeile(t.dauer, `antw:${x.id}:${i}`) : ""}${t.abschrift ? `<p class="text" style="margin:0">${esc(t.abschrift)}</p>` : ""}</section>`).join("");
     const body = foto + memo + abschrift + sprech + antworten
       + `<div class="fusszeile"><div class="tasten"><button class="btn umriss" type="button" data-act="gesehen">Gesehen</button><button class="btn pri" type="button" data-act="antworten">Antworten</button></div></div>`;
@@ -2031,7 +2117,7 @@ a.btn { text-decoration: none; }
 
   function blattUebergabe(a) {
     const me = meinNr(a), w = werkVon(a, me), nach = me + 1, E = ende(a);
-    const kopf = `<div class="blatt-kopf"><p class="neben">${a.id} · Station ${me} · ${esc(w.name)}</p><h2 class="btitel">Fertigstellen</h2></div>`;
+    const kopf = `<div class="blatt-kopf"><p class="neben">${feld("Auftrag", a.id)}${feld("Station", me)}</p><h2 class="btitel">Fertigstellen</h2></div>`;
     const eigeneOffen = a.anmerkungen.some(x => x.von === me && x.art === "frage" && x.offen);
     const eigene = a.anmerkungen.filter(x => x.von === me && !(x.art === "frage" && x.offen));
     const offen = offeneFragen(a).length;
@@ -2088,8 +2174,8 @@ a.btn { text-decoration: none; }
   function bauteilSchritt(p) {
     const offen = p.stationen.map((q, k) => Object.assign({ nr: k + 1 }, q));
     const optStationen = (sel, mitAG) => (mitAG ? `<option value="AG" ${sel === "AG" ? "selected" : ""}>Vom Auftraggeber</option>` : "")
-      + offen.filter(q => !q.fest || q.key === sel).map(q => `<option value="${q.key}" ${sel === q.key ? "selected" : ""}>Station ${q.nr} · ${esc(WERK[q.w].verfahren)}</option>`).join("");
-    const stationText = key => { const q = offen.find(o => o.key === key); return q ? `Station ${q.nr} · ${esc(WERK[q.w].verfahren)}` : "Vom Auftraggeber"; };
+      + offen.filter(q => !q.fest || q.key === sel).map(q => `<option value="${q.key}" ${sel === q.key ? "selected" : ""}>Station ${q.nr}, ${esc(WERK[q.w].verfahren)}</option>`).join("");
+    const stationText = key => { const q = offen.find(o => o.key === key); return q ? `Station ${q.nr}, ${esc(WERK[q.w].verfahren)}` : "Vom Auftraggeber"; };
     /* Bearbeitungen eines Bauteils (g = "") oder einer Baugruppe (g = "g"): Station, 3D-Modell optional */
     const stufenZeilen = (x, k, g) => (x.stufen || []).map((st, n) => {
       const bild = `<span class="vorschau klein">${st.draufsicht && !st.laedt ? `<img src="${st.draufsicht}" alt="">` : ""}</span>`;
@@ -2098,13 +2184,13 @@ a.btn { text-decoration: none; }
             <label class="klein-feld"><span class="beschr">Bearbeitung bei</span><select data-p${g}st="bei" data-i="${k}" data-k="${n}">${optStationen(pStufeBei(p, x, n), false)}</select></label>
             <button class="mini-btn" type="button" data-act="p-${g}stufe-weg" data-i="${k}" data-k="${n}" aria-label="Bearbeitung entfernen">×</button>
             ${st.laedt ? `<span class="sz-modell neben">wird gelesen …</span>`
-              : st.id ? `<span class="sz-modell neben">Neues 3D-Modell · ${esc(st.name)} <button class="textbtn klein" type="button" data-act="p-${g}stufe-modell" data-i="${k}" data-k="${n}">tauschen</button></span>`
+              : st.id ? `<span class="sz-modell neben">Neues 3D-Modell: ${esc(st.name)} <button class="textbtn klein" type="button" data-act="p-${g}stufe-modell" data-i="${k}" data-k="${n}">tauschen</button></span>`
               : `<button class="sz-modell textbtn klein" type="button" data-act="p-${g}stufe-modell" data-i="${k}" data-k="${n}">3D-Modell nach der Bearbeitung</button>`}</div>`;
     }).join("");
     const plusBearbeitung = (k, g) => (offen.some(q => !q.fest) ? `<button class="textbtn klein" type="button" data-act="p-${g}stufe" data-i="${k}">+ Bearbeitung</button>` : "");
     const zeilen = p.modelle.map((x, k) => {
       if (x.laedt) return `<div class="modellzeile"><span class="vorschau"></span><span class="rest"><span class="ktitel">${esc(x.name)}</span><span class="neben">wird gelesen …</span></span></div>`;
-      const masz = `${masse([x.ext[0], x.ext[2], x.ext[1]])} mm${x.dreiecke ? " · " + x.dreiecke.toLocaleString("de-DE") + " Dreiecke" : ""}`;
+      const masz = `${masse([x.ext[0], x.ext[2], x.ext[1]])} mm${x.dreiecke ? ", " + x.dreiecke.toLocaleString("de-DE") + " Dreiecke" : ""}`;
       const entsteht = x.fest
         ? `<span class="neben gesperrt">${pEntsteht(p, x) === "AG" ? "Vom Auftraggeber" : "Gefertigt bei " + stationText(pEntsteht(p, x))}</span>`
         : `<label class="klein-feld"><span class="beschr">Entsteht bei</span><select data-pm="entsteht" data-i="${k}">${optStationen(pEntsteht(p, x), true)}</select></label>
@@ -2144,7 +2230,7 @@ a.btn { text-decoration: none; }
   }
   function blattProjekt() {
     const p = ui.projekt, i = p.schritt;
-    const kopf = `<div class="blatt-kopf"><p class="neben">Neues Projekt · ${i + 1} von ${P_TITEL.length}</p><h2 class="btitel">${P_TITEL[i]}</h2>
+    const kopf = `<div class="blatt-kopf"><p class="neben">Neues Projekt, Schritt ${i + 1} von ${P_TITEL.length}</p><h2 class="btitel">${P_TITEL[i]}</h2>
       <div class="punkte" aria-hidden="true">${P_TITEL.map((_, k) => `<i class="${k <= i ? "an" : ""}"></i>`).join("")}</div></div>`;
     let body = "";
     if (i === 0) {
@@ -2155,14 +2241,14 @@ a.btn { text-decoration: none; }
     } else if (i === 1) {
       const glieder = p.stationen.map((s, k) => {
         const w = WERK[s.w];
-        return stationsBlock({ nr: k + 1, name: esc(w.name), meta: `${esc(w.verfahren)} · Hauptgruppe ${w.hg}`,
+        return stationsBlock({ nr: k + 1, name: esc(w.name), meta: `${esc(w.verfahren)}, Hauptgruppe ${w.hg}`,
           tasten: `<button class="mini-btn" type="button" data-act="p-hoch" data-i="${k}" ${k === 0 ? "disabled" : ""} aria-label="${esc(w.name)} nach vorn">↑</button>
             <button class="mini-btn" type="button" data-act="p-runter" data-i="${k}" ${k === p.stationen.length - 1 ? "disabled" : ""} aria-label="${esc(w.name)} nach hinten">↓</button>
             <button class="mini-btn" type="button" data-act="p-weg" data-i="${k}" aria-label="${esc(w.name)} entfernen">×</button>`,
           feld: `<textarea class="sb-leistung" data-ps="leistung" data-i="${k}" rows="2" placeholder="Leistung" aria-label="Leistung von ${esc(w.name)}">${esc(s.leistung || "")}</textarea>` });
       }).join("");
       const wahl = p.waehlen ? `<section class="karte wahl">${Object.keys(WERK).map(id => `<button class="zeile" type="button" data-act="p-werk" data-w="${id}">
-          <span class="rest"><span class="ktitel">${esc(WERK[id].name)}</span><span class="neben">${esc(WERK[id].verfahren)} · ${esc(WERK[id].adresse)}</span></span><span class="textbtn">Hinzufügen</span></button>`).join("")}</section>` : "";
+          <span class="rest"><span class="ktitel">${esc(WERK[id].name)}</span><span class="neben">${esc(WERK[id].verfahren)}</span><span class="neben">${esc(WERK[id].adresse)}</span></span><span class="textbtn">Hinzufügen</span></button>`).join("")}</section>` : "";
       body = `<div class="kette"><div class="kglied"><span class="knoten a">A</span><span class="rest"><span class="ktitel">Auftraggeber</span></span></div>
         ${glieder || '<div class="kglied"><span class="knoten a">?</span><span class="rest neben">Noch keine Werkstatt gewählt</span></div>'}
         <div class="kglied"><span class="knoten a">A</span><span class="rest"><span class="ktitel">Rückkehr</span></span></div></div>
@@ -2170,7 +2256,7 @@ a.btn { text-decoration: none; }
     } else if (i === 2) {
       body = bauteilSchritt(p);
     } else if (i === 3) {
-      const optStation = sel => `<option value="">Alle Stationen</option>` + p.stationen.map((s, k) => `<option value="${s.key}" ${sel === s.key ? "selected" : ""}>Station ${k + 1} · ${esc(WERK[s.w].name)}</option>`).join("");
+      const optStation = sel => `<option value="">Alle Stationen</option>` + p.stationen.map((s, k) => `<option value="${s.key}" ${sel === s.key ? "selected" : ""}>Station ${k + 1}, ${esc(WERK[s.w].name)}</option>`).join("");
       const arten = ["Zeichnung", "3D-Modell", "Prüfplan", "Sonstiges"];
       const zeilen = p.unterlagen.map((u, k) => `<div class="dokzeile"><div class="reihe"><span class="name">${esc(u.name)}</span>
           <button class="mini-btn" type="button" data-act="p-dok-weg" data-i="${k}" aria-label="${esc(u.name)} entfernen">×</button></div>
@@ -2189,15 +2275,15 @@ a.btn { text-decoration: none; }
       }
     } else {
       const weg = `<div class="kette"><div class="kglied"><span class="knoten a">A</span><span class="rest text">${esc(AUFTRAGGEBER.name)}</span></div>
-        ${p.stationen.map((s, k) => `<div class="kglied"><span class="knoten">${k + 1}</span><span class="rest"><span class="text">${esc(WERK[s.w].name)}</span><span class="neben">${esc(WERK[s.w].verfahren)}${s.leistung && s.leistung.trim() ? " · " + esc(ersterSatz(s.leistung.trim())) : ""}</span></span></div>`).join("")}
+        ${p.stationen.map((s, k) => `<div class="kglied"><span class="knoten">${k + 1}</span><span class="rest"><span class="text">${esc(WERK[s.w].name)}</span><span class="neben">${esc(WERK[s.w].verfahren)}${s.leistung && s.leistung.trim() ? ": " + esc(ersterSatz(s.leistung.trim())) : ""}</span></span></div>`).join("")}
         <div class="kglied"><span class="knoten a">A</span><span class="rest text">Rückkehr</span></div></div>`;
-      const tags = p.unterlagen.map(u => `<span class="tag">${esc(u.art)} · Index ${esc(u.index)}</span>`).join("");
-      body = `<section class="karte"><p class="beschr">Auftrag</p><h2 class="ktitel">${esc(p.titel)}</h2><p class="neben">${p.stueckzahl} Stück · Termin ${fmtDatum(p.termin)} · ${bauteilZahl(p)} Bauteil${bauteilZahl(p) > 1 ? "e" : ""}</p></section>
+      const tags = p.unterlagen.map(u => `<span class="tag">${esc(u.art)}, Index ${esc(u.index)}</span>`).join("");
+      body = `<section class="karte"><p class="beschr">Auftrag</p><h2 class="ktitel">${esc(p.titel)}</h2><p class="neben">${p.stueckzahl} Stück, Termin ${fmtDatum(p.termin)}, ${bauteilZahl(p)} Bauteil${bauteilZahl(p) > 1 ? "e" : ""}</p></section>
         ${p.modelle.length ? `<section class="karte"><p class="beschr">Bauteile</p><div class="modellreihe">${p.modelle.map(x => `<img src="${x.draufsicht}" alt="${esc(x.name)}">`).join("")}</div>
           ${p.modelle.filter(x => (x.stufen || []).length).map(x => `<p class="neben">${esc(x.name)}: ${(x.stufen || []).length} Bearbeitung${(x.stufen || []).length > 1 ? "en" : ""}</p>`).join("")}</section>` : ""}
         ${p.baugruppen.length ? `<section class="karte"><p class="beschr">Baugruppen</p>${p.baugruppen.map(g => {
           const k = p.stationen.findIndex(q => q.key === pFuegt(p, g));
-          return `<div class="zeile"><span class="rest"><span class="text">${esc(g.name)}</span><span class="neben">${g.teile.map(id => esc((p.modelle.find(x => x.id === id) || {}).name || "")).join(" + ")} · gefügt bei Station ${k + 1}</span></span></div>`;
+          return `<div class="zeile"><span class="rest"><span class="text">${esc(g.name)}</span><span class="neben">${g.teile.map(id => esc((p.modelle.find(x => x.id === id) || {}).name || "")).join(" + ")}, gefügt bei Station ${k + 1}</span></span></div>`;
         }).join("")}</section>` : ""}
         <section class="karte"><p class="beschr">Weg des Trägers</p>${weg}</section>
         <section class="karte"><p class="beschr">Unterlagen</p><div class="tags">${tags || '<span class="leer">Keine</span>'}</div></section>
@@ -2782,17 +2868,17 @@ a.btn { text-decoration: none; }
     if (a) {
       const L = a.logistik;
       let ziel;
-      if (L) { const z = ort(a, L.nach); ziel = { t: `Liefern an ${z.name}`, u: `${z.titel} · ${z.adresse}` }; }
+      if (L) { const z = ort(a, L.nach); ziel = { t: `Liefern an ${z.name}`, u: `${z.titel}, ${z.adresse}` }; }
       else if (a.zurueck) ziel = { t: "Beim Auftraggeber", u: "Kein Transport offen" };
-      else { const z = ort(a, jetzt(a)); ziel = { t: `Bei ${z.name}`, u: `${z.titel} · kein Transport offen` }; }
+      else { const z = ort(a, jetzt(a)); ziel = { t: `Bei ${z.name}`, u: `${z.titel}, kein Transport offen` }; }
       code = `<div class="gruppe"><p class="beschr">Code am Träger ${a.traeger}</p><div class="codekarte"><span class="ktitel">${esc(ziel.t)}</span><span class="neben">${esc(ziel.u)}</span></div></div>`;
     }
     const rollen = ROLLEN.map(r => {
       const nrn = a && r.id.charAt(0) === "W" ? a.stationen.filter(q => q.werkstatt === r.id).map(q => q.nr) : [];
-      return `<button class="dbtn" type="button" data-rolle="${r.id}" aria-pressed="${state.ich === r.id}">${esc(r.label)}<small>${nrn.length ? `Station ${nrn.join(" und ")} · ` : ""}${esc(r.sub)}</small></button>`;
+      return `<button class="dbtn" type="button" data-rolle="${r.id}" aria-pressed="${state.ich === r.id}">${esc(r.label)}<small>${nrn.length ? `Station ${nrn.join(" und ")}, ` : ""}${esc(r.sub)}</small></button>`;
     }).join("");
     const traeger = a ? a.traeger : state.freieTraeger[0];
-    $("#demo").innerHTML = `<div><p class="beschr">Prototype Carrier · Entwurf 3</p><h1>Träger-App</h1></div>
+    $("#demo").innerHTML = `<div><p class="beschr">Prototype Carrier, Entwurf 3</p><h1>Träger-App</h1></div>
       <div class="gruppe"><p class="beschr">Sicht</p>${rollen}</div>
       <div class="gruppe"><p class="beschr">Vorführen</p>
         <button class="dbtn" type="button" data-demo="scan" ${traeger ? "" : "disabled"}>Scan simulieren<small>${traeger ? "Träger " + traeger : "Kein Träger"}</small></button>
@@ -2890,7 +2976,7 @@ a.btn { text-decoration: none; }
     else { ui.blatt = "zu"; render(); }
   }
   function anmerkungsMeldung(a, x, empf) {
-    if (empf === "AG") return { titel: `Neue Anmerkung · ${a.id}`, text: `${ARTEN[x.art].name} ${vonTxt(a, x.von)} an ${x.bezug === x.von ? "eigene Station" : kurzName(a, x.bezug)}` };
+    if (empf === "AG") return { titel: `Neue Anmerkung zu Auftrag ${a.id}`, text: `${ARTEN[x.art].name} ${vonTxt(a, x.von)} an ${x.bezug === x.von ? "eigene Station" : kurzName(a, x.bezug)}` };
     return { titel: `Neue Anmerkung für Station ${x.bezug}`, text: `${ARTEN[x.art].name} ${vonTxt(a, x.von)}` };
   }
 
@@ -2956,7 +3042,7 @@ a.btn { text-decoration: none; }
     const K = ui.kette;
     const fest = a.stationen.filter(q => q.status !== "geplant");
     const j = jetzt(a);
-    const kopf = `<div class="blatt-kopf"><p class="neben">${a.id} · ${esc(a.titel)}</p><h2 class="btitel">Kette bearbeiten</h2>
+    const kopf = `<div class="blatt-kopf"><p class="neben">${feld("Auftrag", a.id)}${esc(a.titel)}</p><h2 class="btitel">Kette bearbeiten</h2>
       <div class="seg ketten-seg" role="group" aria-label="Was bearbeiten"><button type="button" data-act="kette-tab" data-tab="stationen" aria-pressed="${K.tab !== "bauteile"}">Stationen</button>
         <button type="button" data-act="kette-tab" data-tab="bauteile" aria-pressed="${K.tab === "bauteile"}">Bauteile</button></div></div>`;
     /* Stationen der Arbeitskopie in der neuen Reihenfolge; Abgeschlossenes ist fest */
@@ -2967,14 +3053,14 @@ a.btn { text-decoration: none; }
     if (K.tab === "bauteile") return { kopf, body: bauteilSchritt(K.p) + fuss };
     const festZeilen = fest.map(q => {
       const w = WERK[q.werkstatt];
-      return stationsBlock({ nr: q.nr, name: esc(w.name), meta: `${esc(w.verfahren)} · Hauptgruppe ${w.hg}`, marke: q.status === "abgeschlossen" ? "fest" : "jetzt",
+      return stationsBlock({ nr: q.nr, name: esc(w.name), meta: `${esc(w.verfahren)}, Hauptgruppe ${w.hg}`, marke: q.status === "abgeschlossen" ? "fest" : "jetzt",
         tasten: q.nr === j ? '<span class="tl-jetzt" style="position:static;transform:none">jetzt</span>' : statusPill(q.status) });
     }).join("");
     const offen = K.liste.map((e, i) => {
       const w = WERK[e.werkstatt], nr = fest.length + i + 1;
       const gebunden = !e.neu && (stationGebunden(a, e.uid) || K.p.modelle.some(x => x.entsteht === e.uid || (x.stufen || []).some(y => y.bei === e.uid)) || K.p.baugruppen.some(g => g.fuegt === e.uid || (g.stufen || []).some(y => y.bei === e.uid)));
       const schleife = a.stationen.some(q => q.werkstatt === e.werkstatt && q.status !== "geplant") || K.liste.some((f, k) => k < i && f.werkstatt === e.werkstatt);
-      return stationsBlock({ nr, name: esc(w.name), meta: `${e.neu ? '<span class="pill st-arbeit sb-neu">neu</span>' : ""}${esc(w.verfahren)} · Hauptgruppe ${w.hg}${schleife ? " · erneut" : ""}`,
+      return stationsBlock({ nr, name: esc(w.name), meta: `${e.neu ? '<span class="pill st-arbeit sb-neu">neu</span>' : ""}${esc(w.verfahren)}, Hauptgruppe ${w.hg}${schleife ? ", erneut" : ""}`,
         tasten: `<button class="mini-btn" type="button" data-act="kette-hoch" data-i="${i}" ${i === 0 ? "disabled" : ""} aria-label="${esc(w.name)} nach vorn">↑</button>
           <button class="mini-btn" type="button" data-act="kette-runter" data-i="${i}" ${i === K.liste.length - 1 ? "disabled" : ""} aria-label="${esc(w.name)} nach hinten">↓</button>
           <button class="mini-btn" type="button" data-act="kette-weg" data-i="${i}" ${gebunden ? "disabled" : ""} aria-label="${esc(w.name)} entfernen">×</button>`,
@@ -3019,10 +3105,10 @@ a.btn { text-decoration: none; }
     LAGE.clear();
     geaendert.forEach(q => {
       const war = vorher.get(q.uid);
-      post(q.werkstatt, a, { titel: war == null ? "Zusätzlicher Schritt für Sie" : "Ihre Station wurde geändert", text: `${a.id} · ${kurzName(a, q.nr)} · ${WERK[q.werkstatt].verfahren}` }, true);
+      post(q.werkstatt, a, { titel: war == null ? "Zusätzlicher Schritt für Sie" : "Ihre Station wurde geändert", text: `Auftrag ${a.id}, ${kurzName(a, q.nr)}: ${WERK[q.werkstatt].verfahren}` }, true);
     });
-    entfernt.forEach(q => post(q.werkstatt, a, { titel: "Ihr Schritt entfällt", text: `${a.id} · ${WERK[q.werkstatt].verfahren}` }, true));
-    bauteilPost.forEach(([uid, namen]) => { const q = stUid(a, uid); if (q) post(q.werkstatt, a, { titel: "Neue 3D-Daten für Sie", text: `${a.id} · ${kurzName(a, q.nr)} · ${namen.join(", ")}` }, true); });
+    entfernt.forEach(q => post(q.werkstatt, a, { titel: "Ihr Schritt entfällt", text: `Auftrag ${a.id}: ${WERK[q.werkstatt].verfahren}` }, true));
+    bauteilPost.forEach(([uid, namen]) => { const q = stUid(a, uid); if (q) post(q.werkstatt, a, { titel: "Neue 3D-Daten für Sie", text: `Auftrag ${a.id}, ${kurzName(a, q.nr)}: ${namen.join(", ")}` }, true); });
     ui.kette = null; ui.ansicht = null;
     schliesseBlatt();
     toast(geaendert.length || entfernt.length || bauteilPost.length ? "Änderungen übernommen" : "Keine Änderung");
@@ -3267,7 +3353,7 @@ a.btn { text-decoration: none; }
     x.antworten.push({ von: me, dauer: d.memo ? d.dauer : 0, audio: d.audio, abschrift: d.text.trim(), zeit: jetztIso(), gelesenVon: [state.ich] });
     if (x.art === "frage") x.offen = false;
     const frager = rolleVon(a, x.von);
-    if (frager && frager !== state.ich) post(frager, a, { anm: x.id, titel: "Antwort auf Ihre Frage", text: `${a.id} · ${me === 0 ? "vom Auftraggeber" : "von Station " + me}` }, true);
+    if (frager && frager !== state.ich) post(frager, a, { anm: x.id, titel: "Antwort auf Ihre Frage", text: `Auftrag ${a.id}, ${me === 0 ? "vom Auftraggeber" : "von Station " + me}` }, true);
     ui.antwort = null; ui.blatt = "anmerkung";
     render();
     toast(`Antwort gesendet an ${kurzName(a, x.von)}`);
@@ -3281,11 +3367,11 @@ a.btn { text-decoration: none; }
     a.logistik = { von: me, nach, status: "angefragt", zeit: jetztIso() };
     const zu = ort(a, nach);
     post("LOG", a, { titel: "Abholung angefragt", text: `Träger ${a.traeger} bei ${WERK[s.werkstatt].name}` }, true);
-    post(rolleVon(a, nach), a, { titel: "Der Träger kommt zu Ihnen", text: `${a.id} · von ${WERK[s.werkstatt].name}` }, true);
+    post(rolleVon(a, nach), a, { titel: "Der Träger kommt zu Ihnen", text: `Auftrag ${a.id}, von ${WERK[s.werkstatt].name}` }, true);
     ui.blatt = "zu"; ui.blattHoehe = "peek"; ui.ansicht = null;
     render();
     grosseMeldung("Logistik benachrichtigt", `${LOGISTIK.name} holt den Träger bei Ihnen ab und bringt ihn zu ${zu.titel === "Auftraggeber" ? "Auftraggeber" : zu.titel}, ${zu.name}.`,
-      `Station ${me} ist abgeschlossen · ${fmtUhr(s.fertig)}`);
+      `Station ${me} ist um ${fmtUhr(s.fertig)} abgeschlossen`);
   }
 
   /* Scan: Änderung 2. Ein Code für alle, die Sicht richtet sich nach der Rolle. */
@@ -3306,7 +3392,7 @@ a.btn { text-decoration: none; }
       let meldung = a.logistik ? `Ziel: ${ort(a, a.logistik.nach).name}` : "Kein Transport offen";
       if (a.logistik && a.logistik.status === "angefragt") {
         a.logistik.status = "abgeholt"; a.logistik.abgeholt = jetztIso();
-        meldung = `Abholung bestätigt · Ziel: ${ort(a, a.logistik.nach).name}`;
+        meldung = `Abholung bestätigt, Ziel: ${ort(a, a.logistik.nach).name}`;
       }
       render(); toast(meldung); return;
     }
@@ -3502,7 +3588,7 @@ a.btn { text-decoration: none; }
     state.freieTraeger = state.freieTraeger.filter(t => t !== p.traeger);
     state.aktuellerAuftrag = a.id;
     post("LOG", a, { titel: "Abholung angefragt", text: `Träger ${a.traeger} beim Auftraggeber` }, true);
-    post(stationen[0].werkstatt, a, { titel: "Ein neuer Auftrag kommt zu Ihnen", text: `${a.id} · ${a.titel}` }, true);
+    post(stationen[0].werkstatt, a, { titel: "Ein neuer Auftrag kommt zu Ihnen", text: `Auftrag ${a.id}: ${a.titel}` }, true);
     schliesseAlles();
     ui.ebene = "traeger"; ui.ansicht = null; ui.bauteil = null;
     render();
@@ -3529,7 +3615,7 @@ a.btn { text-decoration: none; }
   const Scanner = (function () {
     let strom = null, uhr = null, zweck = null, detektor = null, aktiv = false;
     const leinwand = document.createElement("canvas");
-    const wer = () => (state.ich === "AG" ? `als Auftraggeber · ${AUFTRAGGEBER.name}` : state.ich === "LOG" ? `als Logistik · ${LOGISTIK.name}` : `als ${WERK[state.ich].name}`);
+    const wer = () => (state.ich === "AG" ? `als Auftraggeber, ${AUFTRAGGEBER.name}` : state.ich === "LOG" ? `als Logistik, ${LOGISTIK.name}` : `als ${WERK[state.ich].name}`);
     const fuss = html => { $("#scanFuss").innerHTML = html; };
     function bildLesen(quelle, bw, bh) {
       const f = Math.min(1, 800 / Math.max(bw, bh));
@@ -3681,7 +3767,7 @@ a.btn { text-decoration: none; }
       case "log-zustellen": {
         const q = state.auftraege.find(x => x.id === (ui.logAuftrag || "")) || state.auftraege.find(x => x.logistik);
         q.logistik.status = "zugestellt"; q.logistik.zugestellt = jetztIso(); q.logistik.ankunft = null; ui.logAuftrag = q.id;
-        post(rolleVon(q, q.logistik.nach), q, { titel: "Der Träger ist da", text: `${q.id} · zugestellt von ${LOGISTIK.name}` }, true);
+        post(rolleVon(q, q.logistik.nach), q, { titel: "Der Träger ist da", text: `Auftrag ${q.id}, zugestellt von ${LOGISTIK.name}` }, true);
         render(); toast(`Zugestellt an ${ort(q, q.logistik.nach).name}`); break;
       }
       case "demo-auf": document.body.classList.add("demo-offen"); break;
@@ -4299,7 +4385,7 @@ a.btn { text-decoration: none; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261123132955";
+  const BUILD = "20261123235015";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
