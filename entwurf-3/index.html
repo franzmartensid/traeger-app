@@ -519,7 +519,7 @@ a.btn { text-decoration: none; }
 
 /* ---------- Stelle wählen: alles außer dem Bauteil tritt zurück ---------- */
 .screen.stellenwahl .top,
-.screen.stellenwahl .flaeche > :not(.bwell):not(.twin) { opacity: .28; filter: grayscale(1); pointer-events: none; transition: opacity 200ms var(--ease); }
+.screen.stellenwahl .flaeche > :not(.bwell):not(.twin):not(.bwell-rahmen) { opacity: .28; filter: grayscale(1); pointer-events: none; transition: opacity 200ms var(--ease); }
 .screen.stellenwahl .bwell, .screen.stellenwahl .twin { box-shadow: 0 0 0 2.5px var(--accent); cursor: crosshair; }
 .modus-leiste { position: absolute; left: 12px; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 16;
   background: var(--ink); color: var(--surface); border-radius: 18px; padding: 12px 8px 12px 14px; display: flex; gap: 12px; align-items: center;
@@ -618,6 +618,17 @@ a.btn { text-decoration: none; }
 .ketten-seg { width: fit-content; margin-top: 10px; }
 .gesperrt { display: block; margin-top: 6px; }
 .stufe-zeile .sz-text { grid-column: 2 / 4; align-self: center; margin: 0; }
+
+/* ---------- Anmerkung: Taste im Feld des Bauteils ---------- */
+.bwell-rahmen { position: relative; }
+.anm-knopf { position: absolute; right: 12px; bottom: 12px; z-index: 4; display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 16px 0 12px;
+  border: 0; border-radius: 22px; background: var(--accent); color: #fff; font: 700 15px/1 var(--font); }
+.anm-knopf::after { content: ""; position: absolute; inset: -4px; }
+
+/* ---------- Verlauf: Stationen, die das Bauteil nicht betreffen, ausgegraut ---------- */
+.verlauf .vrow.nebenher .knoten[class] { background: var(--surface); box-shadow: inset 0 0 0 1.2px var(--line); border: 0; color: var(--soft-grey); font-weight: 500; }
+.verlauf .vrow.nebenher .rest { color: var(--soft-grey); }
+.verlauf .vrow.nebenher .tl-jetzt { color: var(--soft-grey); }
 </style>
 </head>
 <body>
@@ -627,10 +638,6 @@ a.btn { text-decoration: none; }
   <div class="phone" id="phone">
     <div class="notch" aria-hidden="true"></div>
     <div class="screen" id="screen"></div>
-    <button class="fab" id="fab" type="button" data-act="plus" hidden aria-label="Neue Anmerkung">
-      <span class="kreisf"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M14 5v18M5 14h18" style="stroke:var(--card)" stroke-width="3" stroke-linecap="round"/></svg></span>
-      <span class="lab">Anmerkung</span>
-    </button>
     <div class="modus-leiste" id="modusLeiste" hidden role="status" aria-live="polite"></div>
     <div class="scrim" id="scrim" data-act="blatt-zu"></div>
     <div class="lift" id="lift" aria-hidden="true"></div>
@@ -1336,6 +1343,13 @@ a.btn { text-decoration: none; }
     const ab = start ? start.nr : 1;
     return a.stationen.filter(q => q.nr >= ab && q.nr <= bis).map(q => q.nr);
   }
+  /* Eine Station betrifft ein Bauteil, wenn es dort entsteht, bearbeitet oder gefügt wird */
+  function betrifft(a, b, q) {
+    if (!q) return false;
+    if (b.entsteht === q.uid || (b.stufen || []).some(x => x.bei === q.uid)) return true;
+    const g = b.art === "baugruppe" ? null : gruppeVon(a, b);
+    return !!g && g.entsteht === q.uid;
+  }
   function entstehungText(a, b) {
     if (b.art === "baugruppe") {
       const q = stUid(a, b.entsteht), teile = b.teile.map(id => bauteilName(a, id)).join(", ");
@@ -1687,20 +1701,23 @@ a.btn { text-decoration: none; }
         <button type="button" data-act="stufe-zeigen" data-z="1" aria-pressed="${!!ui.zielSicht}">${ziel.gruppe ? "Nach dem Fügen" : "Nach Bearbeitung"}</button></div>` : "";
     const zeilen = verlaufVon(a, b).map(nr => {
       const chips = a.anmerkungen.filter(x => x.bauteil === b.id && x.von === nr).map(x => chip(x.art, "s")).join("");
-      return `<button class="vrow" type="button" data-act="rueckblick" data-nr="${nr}">
+      const nebenher = !betrifft(a, b, st(a, nr));
+      return `<button class="vrow${nebenher ? " nebenher" : ""}" type="button" data-act="rueckblick" data-nr="${nr}" aria-label="${kurzName(a, nr)} · ${esc(werkVon(a, nr).verfahren)}${nebenher ? ", betrifft dieses Bauteil nicht" : ""}">
         <span class="knoten ${knotenKlasse(a, nr, j)}">${nr}</span>
         <span class="rest text">${kurzName(a, nr)} · ${esc(werkVon(a, nr).verfahren)}</span>
         ${nr === j ? '<span class="tl-jetzt" style="position:static;transform:none">jetzt</span>' : ""}
         <span class="chips">${chips}</span></button>`;
     }).join("");
+    const anmKnopf = state.ich !== "LOG" && !ui.kreismenue && !ui.modus && ui.blatt === "zu" && darfAnmerken(a)
+      ? `<button class="anm-knopf" id="fab" type="button" data-act="plus"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12" style="stroke:currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>Anmerkung</button>` : "";
     const eigene = L.map(x => x.modell), alle = [].concat.apply([], a.bauteile.map(q => stufenVon(a, q).map(x => x.modell)));
     const doks = a.unterlagen.filter(u => !u.modell || eigene.includes(u.modell) || !alle.includes(u.modell));
     return `<div class="head"><div class="kopf-l"><button class="textbtn" type="button" data-act="ebene" data-ebene="traeger" style="min-height:32px">‹ Träger ${a.id}</button>
         <h1 class="titel">${esc(b.name)}</h1></div></div>
       ${umschalter}
       ${b.form === "modell"
-        ? `<div class="bwell b3d${ziel && ui.zielSicht ? " ziel-sicht" : ""}" id="slot3d" data-twin="bauteil3d" data-bt="${b.id}" data-modell="${gezeigt.modell}" data-bild="${gk}" role="group" aria-label="3D-Modell ${esc(b.name)}${ziel && ui.zielSicht ? ", nach der Bearbeitung" : ""}">${pins3d}</div>`
-        : `<div class="bwell"><div class="bpart${b.form === "rund" ? " rund" : ""}" id="bpart" data-twin="bauteil" style="aspect-ratio:${verhaeltnis};${groesse}">${pins}</div></div>`}
+        ? `<div class="bwell-rahmen"><div class="bwell b3d${ziel && ui.zielSicht ? " ziel-sicht" : ""}" id="slot3d" data-twin="bauteil3d" data-bt="${b.id}" data-modell="${gezeigt.modell}" data-bild="${gk}" role="group" aria-label="3D-Modell ${esc(b.name)}${ziel && ui.zielSicht ? ", nach der Bearbeitung" : ""}">${pins3d}</div>${anmKnopf}</div>`
+        : `<div class="bwell-rahmen"><div class="bwell"><div class="bpart${b.form === "rund" ? " rund" : ""}" id="bpart" data-twin="bauteil" style="aspect-ratio:${verhaeltnis};${groesse}">${pins}</div></div>${anmKnopf}</div>`}
       <section class="karte"><h2 class="ktitel">Verlauf dieses Bauteils</h2><div class="verlauf">${zeilen}</div></section>
       <section class="karte"><h2 class="ktitel">Unterlagen</h2>${dokZeilen(doks) || '<p class="leer">Keine Unterlagen</p>'}</section>
       <div class="platz"></div>`;
@@ -2709,12 +2726,8 @@ a.btn { text-decoration: none; }
     letztesBlatt = ui.blatt;
   }
 
+  /* Hinweisleiste beim Wählen der Stelle (die Taste „Anmerkung“ sitzt im Feld des Bauteils) */
   function renderFab(a) {
-    const fab = $("#fab");
-    const zeigen = !!a && state.ich !== "LOG" && !ui.kreismenue && !ui.modus && ui.blatt === "zu" && darfAnmerken(a)
-      && (ui.ebene === "traeger" || ui.ebene === "bauteil");
-    fab.hidden = !zeigen;
-    fab.style.bottom = ui.ebene === "traeger" ? "112px" : "24px";
     const leiste = $("#modusLeiste");
     const waehlen = !!a && ui.modus === "stelle-waehlen";
     if (waehlen && leiste.hidden) {
@@ -4255,7 +4268,7 @@ a.btn { text-decoration: none; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261123123301";
+  const BUILD = "20261123125438";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
