@@ -531,6 +531,8 @@ a.btn { text-decoration: none; }
 .modus-leiste.nochmal { animation: wackeln 380ms var(--ease); }
 @keyframes leisteEin { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes wackeln { 20%, 60% { transform: translateX(-7px); } 40%, 80% { transform: translateX(7px); } }
+
+.abschrift-info { font: 400 13px/1.35 var(--font); color: var(--grey); }
 </style>
 </head>
 <body>
@@ -1612,7 +1614,7 @@ a.btn { text-decoration: none; }
         <button class="kachel foto" type="button" data-act="foto">${ICO.kamera}<span>${d.foto ? "Foto ✓" : "Foto"}</span></button>
         <button class="kachel memo" type="button" data-memo="neu">${ICO.mikro}<span>${d.memo ? "Memo ✓" : "Sprachmemo"}</span><small class="uhr"></small></button></div>`;
     const memo = d.memo ? memoZeile(d.dauer, "neu") : "";
-    const abschrift = d.memo ? `<label class="feld"><span class="beschr">Abschrift</span><textarea data-bind="neu.abschrift" rows="3">${esc(d.abschrift)}</textarea></label>` : "";
+    const abschrift = d.memo ? `<label class="feld"><span class="beschr">Abschrift</span><textarea data-bind="neu.abschrift" rows="3"${d.abschriftStand === "laeuft" ? ' placeholder="Abschrift wird erstellt …"' : ""}>${esc(d.abschrift)}</textarea>${abschriftInfo(d)}</label>` : "";
     /* Bezug: die Kette mit dem Verfahren jeder Station, ohne Vorschlag */
     const glieder = [];
     for (let nr = 0; nr < ende(a); nr++) {
@@ -1763,7 +1765,7 @@ a.btn { text-decoration: none; }
       <span class="btitel">Antworten</span></div><p class="neben">auf ${ARTEN[x.art].name} ${vonTxt(a, x.von)}</p></div>`;
     const body = `<div class="kacheln" style="grid-template-columns:1fr"><button class="kachel memo" type="button" data-memo="antwort">${ICO.mikro}<span>${d.memo ? "Memo ✓" : "Sprachmemo"}</span><small class="uhr"></small></button></div>
       ${d.memo ? memoZeile(d.dauer, "antwort") : ""}
-      <label class="feld"><span class="beschr">${d.memo ? "Abschrift" : "Oder als Text"}</span><textarea data-bind="antwort.text" rows="3">${esc(d.text)}</textarea></label>
+      <label class="feld"><span class="beschr">${d.memo ? "Abschrift" : "Oder als Text"}</span><textarea data-bind="antwort.text" rows="3"${d.abschriftStand === "laeuft" ? ' placeholder="Abschrift wird erstellt …"' : ""}>${esc(d.text)}</textarea>${abschriftInfo(d)}</label>
       <div class="fusszeile"><button class="btn pri block" type="button" data-act="antwort-senden" id="antwortSenden" ${d.memo || d.text.trim() ? "" : "disabled"}>Senden</button></div>`;
     return { kopf, body };
   }
@@ -3453,9 +3455,66 @@ a.btn { text-decoration: none; }
   /* =====================================================================
      Sprachmemo: halten und sprechen
      ===================================================================== */
-  const aufn = { an: false, start: 0, rec: null, stream: null, sr: null, text: "", ziel: null, el: null, uhr: null, teile: [] };
+  const aufn = { an: false, start: 0, rec: null, stream: null, ziel: null, el: null, uhr: null, teile: [], sitzung: null };
+  /* Gründe, warum keine Abschrift entsteht, so wie die Spracherkennung des Browsers sie meldet */
+  const ABSCHRIFT_FEHLER = {
+    "kein-browser": "Dieser Browser hat keine Spracherkennung.",
+    "not-allowed": "Mikrofon oder Spracherkennung sind nicht erlaubt.",
+    "service-not-allowed": "Spracherkennung ist nicht verfügbar. Auf dem iPhone muss die Diktierfunktion eingeschaltet sein.",
+    "audio-capture": "Die Spracherkennung bekommt kein Mikrofon.",
+    "network": "Die Spracherkennung braucht eine Internetverbindung.",
+    "language-not-supported": "Deutsch wird von der Spracherkennung nicht unterstützt.",
+    "leer": "Keine Sprache erkannt."
+  };
+  function abschriftInfo(d) {
+    if (!d.abschriftStand || d.abschriftStand === "ok" || d.abschriftStand === "laeuft") return "";
+    return `<span class="abschrift-info">${esc(ABSCHRIFT_FEHLER[d.abschriftStand] || ABSCHRIFT_FEHLER.leer)}</span>`;
+  }
+  function starteErkennung() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const sz = { sr: null, final: "", vorlaeufig: "", fehler: SR ? null : "kein-browser", ende: !SR, gestoppt: false, d: null, ziel: null, fertig: false, frist: 0 };
+    if (!SR) return sz;
+    try {
+      const r = new SR();
+      r.lang = "de-DE"; r.interimResults = true; r.continuous = true; r.maxAlternatives = 1;
+      r.onresult = ev => {
+        let fin = "", vor = "";
+        for (let i = 0; i < ev.results.length; i++) {
+          const t = ev.results[i][0] ? ev.results[i][0].transcript : "";
+          if (ev.results[i].isFinal) fin += t; else vor += t;
+        }
+        sz.final = fin; sz.vorlaeufig = vor;
+      };
+      r.onerror = ev => { if (ev.error !== "aborted" && ev.error !== "no-speech") sz.fehler = ev.error; };
+      r.onend = () => { sz.ende = true; if (sz.gestoppt) abschriftFertig(sz); };
+      r.start();
+      sz.sr = r;
+    } catch (err) { sz.fehler = "service-not-allowed"; sz.ende = true; }
+    return sz;
+  }
+  function abschriftFertig(sz) {
+    if (sz.fertig || !sz.d) return;
+    sz.fertig = true;
+    clearTimeout(sz.frist);
+    const text = (sz.final + " " + sz.vorlaeufig).replace(/\s+/g, " ").trim();
+    const d = sz.d;
+    const feld = sz.ziel === "antwort" ? "text" : "abschrift";
+    const fokus = document.activeElement && document.activeElement.matches(`[data-bind="${sz.ziel === "antwort" ? "antwort.text" : "neu.abschrift"}"]`);
+    if (text) {
+      if (!fokus || !String(d[feld] || "").trim()) d[feld] = text;
+      d.abschriftStand = "ok";
+    } else d.abschriftStand = sz.fehler || "leer";
+    const offen = (sz.ziel === "antwort" && ui.antwort === d && ui.blatt === "antwort") || (sz.ziel === "neu" && ui.neu === d && ui.blatt === "neu");
+    if (!offen) return;
+    if (fokus && text && String(d[feld]) !== text) return;
+    render();
+    if (sz.ziel === "antwort") { const b = $("#antwortSenden"); if (b) b.disabled = !(d.memo || d.text.trim()); }
+  }
   async function starteAufnahme(ziel, el) {
-    Object.assign(aufn, { an: true, start: Date.now(), text: "", ziel, el, teile: [], rec: null, stream: null, sr: null });
+    if (aufn.sitzung && !aufn.sitzung.fertig && aufn.sitzung.sr) { try { aufn.sitzung.sr.abort(); } catch (err) { /* leer */ } }
+    Object.assign(aufn, { an: true, start: Date.now(), ziel, el, teile: [], rec: null, stream: null });
+    /* Spracherkennung zuerst und ohne Warten starten, noch innerhalb der Berührung */
+    aufn.sitzung = starteErkennung();
     el.classList.add("rec");
     const sm = el.querySelector("small");
     aufn.uhr = setInterval(() => { if (sm) sm.textContent = "Aufnahme " + dauer(Math.round((Date.now() - aufn.start) / 1000)); }, 250);
@@ -3467,15 +3526,6 @@ a.btn { text-decoration: none; }
       aufn.rec.ondataavailable = ev => { if (ev.data && ev.data.size) aufn.teile.push(ev.data); };
       aufn.rec.start();
     } catch (err) { /* ohne Mikrofon wird nur die Dauer festgehalten */ }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SR && aufn.an) {
-      try {
-        const r = new SR();
-        r.lang = "de-DE"; r.interimResults = true; r.continuous = true;
-        r.onresult = ev => { let t = ""; for (const res of ev.results) t += res[0].transcript; aufn.text = t; };
-        r.start(); aufn.sr = r;
-      } catch (err) { aufn.sr = null; }
-    }
   }
   function stoppeAufnahme() {
     if (!aufn.an) return;
@@ -3483,18 +3533,23 @@ a.btn { text-decoration: none; }
     clearInterval(aufn.uhr);
     const sek = Math.max(1, Math.round((Date.now() - aufn.start) / 1000));
     const d = aufn.ziel === "antwort" ? ui.antwort : ui.neu;
-    try { if (aufn.sr) aufn.sr.stop(); } catch (err) { /* leer */ }
     if (aufn.rec && aufn.rec.state !== "inactive") {
-      const ziel = d;
-      aufn.rec.onstop = () => { if (aufn.teile.length && ziel) ziel.audio = URL.createObjectURL(new Blob(aufn.teile, { type: aufn.rec.mimeType || "audio/webm" })); };
-      try { aufn.rec.stop(); } catch (err) { /* leer */ }
+      const ziel = d, teile = aufn.teile, rec = aufn.rec;
+      rec.onstop = () => { if (teile.length && ziel) ziel.audio = URL.createObjectURL(new Blob(teile, { type: rec.mimeType || "audio/webm" })); };
+      try { rec.stop(); } catch (err) { /* leer */ }
     }
     if (aufn.stream) aufn.stream.getTracks().forEach(t => t.stop());
-    if (!d) return;
-    const text = aufn.text.trim();
+    const sz = aufn.sitzung;
+    if (!d) { if (sz && sz.sr) try { sz.sr.abort(); } catch (err) { /* leer */ } return; }
     d.memo = true; d.dauer = sek;
-    if (aufn.ziel === "antwort") { if (text && !d.text.trim()) d.text = text; }
-    else if (text) d.abschrift = text;
+    if (sz) {
+      sz.d = d; sz.ziel = aufn.ziel; sz.gestoppt = true;
+      d.abschriftStand = "laeuft";
+      if (sz.sr) { try { sz.sr.stop(); } catch (err) { /* leer */ } }
+      /* Das Ergebnis kommt nach dem Loslassen. Spätestens nach vier Sekunden wird abgeschlossen. */
+      if (sz.ende) setTimeout(() => abschriftFertig(sz), 0);
+      else sz.frist = setTimeout(() => abschriftFertig(sz), 4000);
+    }
     render();
   }
   let spieler = null;
@@ -3528,7 +3583,7 @@ a.btn { text-decoration: none; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261123090142";
+  const BUILD = "20261123090940";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
