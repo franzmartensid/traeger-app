@@ -561,6 +561,28 @@ a.btn { text-decoration: none; }
 /* ---------- Träger freigeben ---------- */
 .haken-feld { display: flex; gap: 12px; align-items: center; min-height: 44px; font: 500 15px/1.35 var(--font); cursor: pointer; }
 .haken-feld input { width: 22px; height: 22px; accent-color: var(--ink); flex: 0 0 auto; margin: 0; }
+
+/* ---------- Entwicklungsstufen: Ziel im Zwilling und in der 3D-Ansicht ---------- */
+.ziel-bild { pointer-events: none; }
+.soll-platz.ziel { stroke: var(--accent); stroke-width: 1.6px; }
+.ziel-legende { display: grid; gap: 4px; margin: 8px 2px 0; font: 500 13px/1.35 var(--font); color: var(--ink); }
+.ziel-legende span { display: flex; align-items: center; gap: 8px; }
+.ziel-legende i { width: 20px; height: 13px; border-radius: 3px; flex: 0 0 auto; }
+.ziel-legende .lg-ziel { border: 2px solid var(--accent); background: var(--accent-soft); }
+.ziel-legende .lg-neu { border: 1.6px dashed var(--accent); }
+.stufen-seg { width: fit-content; margin: 0 0 10px; }
+.bwell.ziel-sicht { box-shadow: inset 0 0 0 2px var(--accent); }
+.ziel-marke { position: absolute; left: 12px; top: 12px; z-index: 2; background: var(--accent-soft); color: var(--ink); border-radius: 12px; padding: 3px 10px; font: 600 12px/18px var(--font); pointer-events: none; }
+.stufe-zeile { display: flex; align-items: flex-end; gap: 8px; margin-top: 6px; }
+.stufe-zeile .klein-feld { flex: 1; min-width: 0; }
+.vorschau.klein { width: 44px; height: 40px; border-radius: 8px; background: var(--row); display: grid; place-items: center; flex: 0 0 auto; overflow: hidden; }
+.vorschau.klein img { max-width: 38px; max-height: 32px; }
+.textbtn.klein { min-height: 36px; font-size: 14px; justify-self: start; }
+.modellzeile { display: grid; grid-template-columns: 64px minmax(0, 1fr) 40px; column-gap: 12px; }
+.stufen-block { grid-column: 1 / -1; display: grid; gap: 6px; padding-left: 20px; }
+.stufen-block:empty { display: none; }
+.stufe-zeile { display: grid; grid-template-columns: 44px minmax(0, 1fr) 40px; gap: 10px; align-items: end; margin-top: 2px; }
+.stufen-block .textbtn.klein { justify-self: start; }
 </style>
 </head>
 <body>
@@ -1149,7 +1171,7 @@ a.btn { text-decoration: none; }
   let state = laden();
   const ui = {
     ebene: "alle", bauteil: null, ansicht: null, blatt: "zu", blattHoehe: "peek", kreismenue: null, modus: null,
-    offeneAnmerkung: null, unterlagenVon: null, dokument: null, dokVon: null, auftragAuf: false, neu: null, antwort: null, projekt: null, kette: null, landet: null, logAuftrag: null
+    offeneAnmerkung: null, unterlagenVon: null, dokument: null, dokVon: null, auftragAuf: false, neu: null, antwort: null, projekt: null, kette: null, zielSicht: false, landet: null, logAuftrag: null
   };
 
   /* =====================================================================
@@ -1203,6 +1225,45 @@ a.btn { text-decoration: none; }
     const q = stUid(a, b.entsteht);
     return !!q && q.status === "abgeschlossen" && q.nr <= v;
   }
+  /* Entwicklungsstufen eines Bauteils: Stufe 1 ist das Modell, mit dem es entsteht; jede weitere gilt nach der Bearbeitung bei einer Station */
+  function stufenVon(a, b) {
+    const s0 = { modell: b.modell, draufsicht: b.draufsicht, kontur: b.kontur, ext: b.ext, bei: b.entsteht || "AG" };
+    const nr = q => ((stUid(a, q.bei) || {}).nr || 0);
+    return [s0].concat((b.stufen || []).slice().sort((p, q) => nr(p) - nr(q)));
+  }
+  function stufeFertig(a, x, v) {
+    if (!x.bei || x.bei === "AG") return true;
+    const q = stUid(a, x.bei);
+    return !!q && q.status === "abgeschlossen" && q.nr <= v;
+  }
+  /* Stand bei Station v: die letzte fertige Stufe; vor der ersten Station die erste Stufe (blass) */
+  function aktuelleStufe(a, b, v) {
+    const L = stufenVon(a, b);
+    let k = 0;
+    L.forEach((x, i) => { if (i > 0 && stufeFertig(a, x, v)) k = i; });
+    return L[k];
+  }
+  /* Ziel: die Stufe, die die Station, die jetzt dran ist, aus dem Bauteil macht */
+  function zielStufe(a, b, v) {
+    const j = jetzt(a);
+    if (v !== j) return null;
+    const q = st(a, j);
+    if (!q || q.status === "abgeschlossen") return null;
+    return stufenVon(a, b).find((x, i) => i > 0 && x.bei === q.uid) || null;
+  }
+  const zeigtZiel = a => state.ich === "AG" || (istWerk() && meinNr(a) === jetzt(a));
+  /* Platz im Zwilling: so groß wie die größte Stufe, damit ein Wechsel der Stufe nichts verschiebt */
+  function platzExt(b) {
+    const E = [b.ext].concat((b.stufen || []).map(x => x.ext)).filter(Boolean);
+    return [0, 1, 2].map(i => Math.max.apply(null, E.map(e => e[i])));
+  }
+  /* Rechteck einer Stufe im Platz, mittig, im gemeinsamen Maßstab (x, w in Einheiten; y, h in Prozent der Höhe) */
+  function stufenRect(b, x, L) {
+    if (b.form !== "modell" || !x || !x.ext) return L;
+    const E = platzExt(b), m = L.w / Math.max(E[0], 1e-6);
+    const w = x.ext[0] * m, h = x.ext[2] * m * 100 / 80;
+    return { x: L.x + (L.w - w) / 2, y: L.y + (L.h - h) / 2, w, h };
+  }
   const gruppeVon = (a, b) => a.bauteile.find(g => g.art === "baugruppe" && g.teile.includes(b.id));
   /* Was der Zwilling bei Station v zeigt: Einzelteile, nach dem Fügen die Baugruppe an ihrer Stelle */
   function zwillingTeile(a, v) {
@@ -1221,7 +1282,7 @@ a.btn { text-decoration: none; }
     const schluessel = a.id + "|" + liste.map(b => b.id).join(",");
     if (LAGE.has(schluessel)) return LAGE.get(schluessel);
     const m = new Map();
-    if (liste.length && liste.every(b => b.form === "modell" && b.ext)) packe(liste).forEach((l, i) => m.set(liste[i].id, l));
+    if (liste.length && liste.every(b => b.form === "modell" && b.ext)) packe(liste.map(b => ({ ext: platzExt(b) }))).forEach((l, i) => m.set(liste[i].id, l));
     else liste.forEach(b => m.set(b.id, { x: b.x, y: b.y, w: b.w, h: b.h }));
     LAGE.set(schluessel, m);
     return m;
@@ -1359,15 +1420,26 @@ a.btn { text-decoration: none; }
 
   /* Zwilling als SVG mit viewBox in Prozent der Trägerfläche (Höhe 80 %).
      Noch nicht gefertigte Teile erscheinen blass an ihrem Platz, gefertigte kräftig. */
-  function zwillingSvg(a, sel, v = jetzt(a)) {
-    const lage = lageVon(a, v), liste = zwillingTeile(a, v);
+  function zwillingSvg(a, sel, v = jetzt(a), mitZiel = false) {
+    const lage = lageVon(a, v), liste = zwillingTeile(a, v), j = jetzt(a), jq = st(a, j);
     const teile = liste.map(b => {
-      const L = lage.get(b.id);
-      if (!L) return "";
-      const x = L.x, y = L.y * .8, w = L.w, h = L.h * .8, s = sel === b.id, da = vorhanden(a, b, v);
+      const P = lage.get(b.id);
+      if (!P) return "";
+      const da = vorhanden(a, b, v), stufe = da ? aktuelleStufe(a, b, v) : stufenVon(a, b)[0];
+      const L = stufenRect(b, stufe, P);
+      const x = L.x, y = L.y * .8, w = L.w, h = L.h * .8, s = sel === b.id;
       if (b.form === "modell") {
         const r = cls => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="2" ry="2"/>`;
-        return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}">${s ? r("halo") : ""}${da ? "" : r("soll-platz")}<image href="${b.draufsicht}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/>${s ? r("part sel rahmen") : ""}</g>`;
+        /* Was die Station, die jetzt dran ist, aus dem Teil macht */
+        const eigen = mitZiel && !da && jq && b.entsteht === jq.uid && jq.status !== "abgeschlossen";
+        const z = mitZiel && da ? zielStufe(a, b, v) : null;
+        let ziel = "";
+        if (z) {
+          const Z = stufenRect(b, z, P), zy = Z.y * .8, zh = Z.h * .8;
+          ziel = z.kontur ? `<image class="ziel-bild" href="${z.kontur}" x="${Z.x}" y="${zy}" width="${Z.w}" height="${zh}" preserveAspectRatio="none"/>`
+            : `<rect class="soll-platz ziel" x="${Z.x}" y="${zy}" width="${Z.w}" height="${zh}" rx="2" ry="2"/>`;
+        }
+        return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}${z || eigen ? " mit-ziel" : ""}">${s ? r("halo") : ""}${da ? "" : r("soll-platz" + (eigen ? " ziel" : ""))}<image href="${stufe.draufsicht}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"/>${ziel}${s ? r("part sel rahmen") : ""}</g>`;
       }
       const form = cls => (b.form === "rund"
         ? `<ellipse class="${cls}" cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}"/>`
@@ -1386,8 +1458,11 @@ a.btn { text-decoration: none; }
   /* Lage eines Pins auf dem Zwilling; null, wenn sein Bauteil gerade nicht zu sehen ist */
   function pinPos(a, x, v = jetzt(a)) {
     if (!x.bauteil) return { x: klemme(x.stelle.x * 100, 4, 96), y: klemme(x.stelle.y * 100, 5, 95) };
-    const L = lageVon(a, v).get(x.bauteil);
-    if (!L) return null;
+    const P = lageVon(a, v).get(x.bauteil);
+    if (!P) return null;
+    const b = a.bauteile.find(q => q.id === x.bauteil);
+    const stufe = b && x.modell ? stufenVon(a, b).find(q => q.modell === x.modell) : (b ? stufenVon(a, b)[0] : null);
+    const L = b ? stufenRect(b, stufe, P) : P;
     return { x: klemme(L.x + x.stelle.x * L.w, 4, 96), y: klemme(L.y + x.stelle.y * L.h, 5, 95) };
   }
   function pinAria(a, x) {
@@ -1489,7 +1564,8 @@ a.btn { text-decoration: none; }
     }
     const pins = a.anmerkungen.filter(x => !rueck || x.von <= v).map(x => { const q = pinPos(a, x, v); return q ? pinHtml(a, x, q) : ""; }).join("");
     const traegerSel = ui.kreismenue && !ui.kreismenue.bauteil ? " traeger-sel" : "";
-    const twin = `<div class="twin${traegerSel}" id="twin" data-twin="traeger" role="group" aria-label="Zwilling des Trägers ${a.traeger}">${zwillingSvg(a, ui.kreismenue && ui.kreismenue.bauteil, v)}${pins}</div>`;
+    const twin = `<div class="twin${traegerSel}" id="twin" data-twin="traeger" role="group" aria-label="Zwilling des Trägers ${a.traeger}">${zwillingSvg(a, ui.kreismenue && ui.kreismenue.bauteil, v, zeigtZiel(a) && v === j)}${pins}</div>`
+      + zielLegende(a, v);
     let unten;
     if (ui.kreismenue) {
       unten = "";
@@ -1511,6 +1587,20 @@ a.btn { text-decoration: none; }
     return kopf + twin + unten + `<div class="platz${ui.blatt !== "zu" ? " gross" : ""}"></div>`;
   }
 
+  /* Legende unter dem Zwilling, solange eine Station Bauteile fertigt oder verändert */
+  function zielLegende(a, v) {
+    const j = jetzt(a), q = st(a, j);
+    if (!q || q.status === "abgeschlossen" || v !== j || !zeigtZiel(a) || ui.kreismenue || ui.modus) return "";
+    const liste = zwillingTeile(a, v);
+    const neu = liste.filter(b => b.form === "modell" && !vorhanden(a, b, v) && b.entsteht === q.uid);
+    const um = liste.filter(b => b.form === "modell" && vorhanden(a, b, v) && zielStufe(a, b, v));
+    if (!neu.length && !um.length) return "";
+    const wer = state.ich === "AG" ? `bei ${kurzName(a, j)}` : "bei Ihnen";
+    const teile = [];
+    if (um.length) teile.push(`<span><i class="lg-ziel"></i>Nach Bearbeitung ${wer}: ${um.map(b => esc(b.name)).join(", ")}</span>`);
+    if (neu.length) teile.push(`<span><i class="lg-neu"></i>Entsteht ${wer}: ${neu.map(b => esc(b.name)).join(", ")}</span>`);
+    return `<p class="ziel-legende">${teile.join("")}</p>`;
+  }
   function knotenKlasse(a, nr, j) {
     const E = ende(a);
     if (nr === 0) return j === 0 && !a.logistik ? "n-jetzt" : "n-fertig";
@@ -1558,7 +1648,18 @@ a.btn { text-decoration: none; }
     const groesse = b.w / (b.h * .8) >= 1.1 ? "width:82%" : "height:82%";
     const pins = a.anmerkungen.filter(x => x.bauteil === b.id)
       .map(x => pinHtml(a, x, { x: klemme(x.stelle.x * 100, 4, 96), y: klemme(x.stelle.y * 100, 5, 95) })).join("");
-    const pins3d = a.anmerkungen.filter(x => x.bauteil === b.id).map(x => pinHtml(a, x, { x: -100, y: -100 })).join("");
+    /* Stufen: jetzt oder, während die Station daran arbeitet, nach der Bearbeitung */
+    const L = stufenVon(a, b), da = vorhanden(a, b, j);
+    const jetztStufe = da ? aktuelleStufe(a, b, j) : L[0];
+    const ziel = zeigtZiel(a) && ansicht(a) === j && da ? zielStufe(a, b, j) : null;
+    if (!ziel) ui.zielSicht = false;
+    const gezeigt = ziel && ui.zielSicht ? ziel : jetztStufe;
+    const gk = L.indexOf(gezeigt);
+    const pins3d = a.anmerkungen.filter(x => x.bauteil === b.id && (x.modell ? x.modell === gezeigt.modell : gk === 0)).map(x => pinHtml(a, x, { x: -100, y: -100 })).join("");
+    const umschalter = ziel ? `<div class="seg stufen-seg" role="group" aria-label="Stand des Bauteils">
+        <button type="button" data-act="stufe-zeigen" data-z="0" aria-pressed="${!ui.zielSicht}">Jetzt</button>
+        <button type="button" data-act="stufe-zeigen" data-z="1" aria-pressed="${!!ui.zielSicht}">Nach Bearbeitung</button></div>` : "";
+    const stufenInfo = L.length > 1 ? `Stufe ${gk + 1} von ${L.length}${gezeigt.bei && gezeigt.bei !== "AG" && stUid(a, gezeigt.bei) && gk > 0 ? " · nach " + kurzName(a, stUid(a, gezeigt.bei).nr) + " · " + WERK[stUid(a, gezeigt.bei).werkstatt].verfahren : ""}` : "";
     const zeilen = verlaufVon(a, b).map(nr => {
       const chips = a.anmerkungen.filter(x => x.bauteil === b.id && x.von === nr).map(x => chip(x.art, "s")).join("");
       return `<button class="vrow" type="button" data-act="rueckblick" data-nr="${nr}">
@@ -1567,11 +1668,13 @@ a.btn { text-decoration: none; }
         ${nr === j ? '<span class="tl-jetzt" style="position:static;transform:none">jetzt</span>' : ""}
         <span class="chips">${chips}</span></button>`;
     }).join("");
-    const doks = a.unterlagen.filter(u => !u.modell || u.modell === b.modell || !a.bauteile.some(q => q.modell === u.modell));
+    const eigene = L.map(x => x.modell), alle = [].concat.apply([], a.bauteile.map(q => stufenVon(a, q).map(x => x.modell)));
+    const doks = a.unterlagen.filter(u => !u.modell || eigene.includes(u.modell) || !alle.includes(u.modell));
     return `<div class="head"><div class="kopf-l"><button class="textbtn" type="button" data-act="ebene" data-ebene="traeger" style="min-height:32px">‹ Träger ${a.id}</button>
-        <h1 class="titel">${esc(b.name)}</h1><p class="neben">${esc(entstehungText(a, b))}</p></div></div>
+        <h1 class="titel">${esc(b.name)}</h1><p class="neben">${esc(entstehungText(a, b))}</p>${stufenInfo ? `<p class="neben">${esc(stufenInfo)}</p>` : ""}</div></div>
+      ${umschalter}
       ${b.form === "modell"
-        ? `<div class="bwell b3d" id="slot3d" data-twin="bauteil3d" data-bt="${b.id}" role="group" aria-label="3D-Modell ${esc(b.name)}">${pins3d}</div>`
+        ? `<div class="bwell b3d${ziel && ui.zielSicht ? " ziel-sicht" : ""}" id="slot3d" data-twin="bauteil3d" data-bt="${b.id}" data-modell="${gezeigt.modell}" data-bild="${gk}" role="group" aria-label="3D-Modell ${esc(b.name)}${ziel && ui.zielSicht ? ", nach der Bearbeitung" : ""}">${ziel && ui.zielSicht ? `<span class="ziel-marke">Nach Bearbeitung</span>` : ""}${pins3d}</div>`
         : `<div class="bwell"><div class="bpart${b.form === "rund" ? " rund" : ""}" id="bpart" data-twin="bauteil" style="aspect-ratio:${verhaeltnis};${groesse}">${pins}</div></div>`}
       <section class="karte"><h2 class="ktitel">Verlauf dieses Bauteils</h2><div class="verlauf">${zeilen}</div></section>
       <section class="karte"><h2 class="ktitel">Unterlagen</h2>${dokZeilen(doks) || '<p class="leer">Keine Unterlagen</p>'}</section>
@@ -1803,7 +1906,7 @@ a.btn { text-decoration: none; }
     const a = cur(), u = a.unterlagen.find(x => x.id === id);
     if (!u) return;
     /* 3D-Modell eines Bauteils: gleich die drehbare Ansicht */
-    const b = u.modell && a.bauteile.find(q => q.modell === u.modell);
+    const b = u.modell && a.bauteile.find(q => stufenVon(a, q).some(x => x.modell === u.modell));
     if (b) { ui.ebene = "traeger"; oeffneBauteil(b.id); return; }
     ui.dokVon = ui.blatt === "unterlagen" ? "unterlagen" : null;
     ui.dokument = id; ui.blatt = "dokument"; ui.blattHoehe = "voll";
@@ -1898,8 +2001,15 @@ a.btn { text-decoration: none; }
     const zeilen = eigene.map(x => `<div class="mit a-${x.art}">${chip(x.art, "s")}<span>${ARTEN[x.art].name} → ${x.bezug === me ? "eigene Station" : kurzName(a, x.bezug)}</span></div>`).join("")
       + (offen ? `<div class="mit a-frage">${chip("frage", "s")}<span>${offen} offene Frage${offen > 1 ? "n" : ""}</span></div>` : "");
     const ziel = ort(a, nach);
-    const hier = a.bauteile.filter(b => b.entsteht === st(a, me).uid);
-    const entsteht = hier.length ? `<section class="karte"><h2 class="ktitel">Bei Ihnen entstanden</h2>${hier.map(b => `<div class="zeile"><span style="color:var(--ink)">${ICO.haken}</span><span class="rest"><span class="text">${esc(b.name)}</span><span class="neben">${b.art === "baugruppe" ? "gefügt aus " + b.teile.map(id => esc(bauteilName(a, id))).join(", ") : "gefertigt"}</span></span></div>`).join("")}</section>` : "";
+    const uid = st(a, me).uid;
+    const hier = a.bauteile.filter(b => b.entsteht === uid || (b.stufen || []).some(x => x.bei === uid));
+    const wie = b => {
+      if (b.art === "baugruppe") return "gefügt aus " + b.teile.map(id => esc(bauteilName(a, id))).join(", ");
+      if (b.entsteht === uid) return "gefertigt";
+      const L = stufenVon(a, b), k = L.findIndex(x => x.bei === uid);
+      return `bearbeitet · Stufe ${k + 1} von ${L.length}`;
+    };
+    const entsteht = hier.length ? `<section class="karte"><h2 class="ktitel">Bei Ihnen entstanden</h2>${hier.map(b => `<div class="zeile"><span style="color:var(--ink)">${ICO.haken}</span><span class="rest"><span class="text">${esc(b.name)}</span><span class="neben">${wie(b)}</span></span></div>`).join("")}</section>` : "";
     const naechste = `<section class="karte"><h2 class="ktitel">${nach === E ? "Rückkehr" : "Nächste Station"}</h2><div class="naechste"><span class="rund">${knotenText(a, nach)}</span>
       <div><p class="ktitel" style="font-weight:600">${esc(ziel.titel)}</p><p class="werk" style="font-size:14px">${esc(ziel.name)}</p><p class="neben">${esc(ziel.adresse)}</p></div></div></section>`;
     const body = (eigeneOffen ? `<p class="hinweiszeile frage">Ihre Frage ist noch offen.</p>` : "")
@@ -1914,13 +2024,21 @@ a.btn { text-decoration: none; }
   function projektWeiterOk(p) {
     if (p.schritt === 0) return p.titel.trim().length > 0;
     if (p.schritt === 1) return p.stationen.length > 0;
-    if (p.schritt === 2) return !p.modelle.some(x => x.laedt) && !p.baugruppen.some(g => g.laedt || g.teile.length < 2);
+    if (p.schritt === 2) return !p.modelle.some(x => x.laedt || (x.stufen || []).some(st => st.laedt)) && !p.baugruppen.some(g => g.laedt || g.teile.length < 2);
     if (p.schritt === 4) return !!p.traeger;
     return true;
   }
   const bauteilZahl = p => (p.modelle.length ? p.modelle.length : p.bauteile);
   /* Wo ein Teil entsteht: beim Auftraggeber beigelegt oder bei einer Station der Kette */
   const pEntsteht = (p, x) => (x.entsteht === "AG" || p.stationen.some(q => q.key === x.entsteht) ? x.entsteht : (p.stationen[0] ? p.stationen[0].key : "AG"));
+  /* Station, nach der eine Stufe gilt: vorgegeben ist die Station nach der vorigen Stufe */
+  function pStufeBei(p, x, n) {
+    const st = x.stufen[n];
+    if (p.stationen.some(q => q.key === st.bei)) return st.bei;
+    const vorher = n === 0 ? x.entsteht : x.stufen[n - 1].bei;
+    const i = p.stationen.findIndex(q => q.key === vorher);
+    return (p.stationen[Math.min(i + 1, p.stationen.length - 1)] || {}).key || "";
+  }
   const pFuegt = (p, g) => (p.stationen.some(q => q.key === g.fuegt) ? g.fuegt : (p.stationen.find(q => WERK[q.w].verfahren === "Fügen") || p.stationen[p.stationen.length - 1] || {}).key || "");
   function bauteilSchritt(p) {
     const optStationen = (sel, mitAG) => (mitAG ? `<option value="AG" ${sel === "AG" ? "selected" : ""}>Vom Auftraggeber</option>` : "")
@@ -1930,7 +2048,12 @@ a.btn { text-decoration: none; }
       : `<div class="modellzeile"><span class="vorschau"><img src="${x.draufsicht}" alt=""></span>
           <span class="rest"><input data-pm="name" data-i="${k}" value="${esc(x.name)}" aria-label="Name des Bauteils" autocomplete="off"><span class="neben">${masse([x.ext[0], x.ext[2], x.ext[1]])} mm · ${x.dreiecke.toLocaleString("de-DE")} Dreiecke</span>
           <label class="klein-feld"><span class="beschr">Entsteht bei</span><select data-pm="entsteht" data-i="${k}">${optStationen(pEntsteht(p, x), true)}</select></label></span>
-          <button class="mini-btn" type="button" data-act="p-modell-weg" data-i="${k}" aria-label="${esc(x.name)} entfernen">×</button></div>`)).join("");
+          <button class="mini-btn" type="button" data-act="p-modell-weg" data-i="${k}" aria-label="${esc(x.name)} entfernen">×</button>
+          <div class="stufen-block">${(x.stufen || []).map((st, n) => (st.laedt ? `<div class="stufe-zeile"><span class="vorschau klein"></span><span class="rest neben">Stufe ${n + 2} wird gelesen …</span></div>`
+            : `<div class="stufe-zeile"><span class="vorschau klein"><img src="${st.draufsicht}" alt=""></span>
+              <label class="klein-feld"><span class="beschr">Stufe ${n + 2} · nach</span><select data-pst="bei" data-i="${k}" data-k="${n}">${optStationen(pStufeBei(p, x, n), false)}</select></label>
+              <button class="mini-btn" type="button" data-act="p-stufe-weg" data-i="${k}" data-k="${n}" aria-label="Stufe ${n + 2} entfernen">×</button></div>`)).join("")}
+          ${p.stationen.length ? `<button class="textbtn klein" type="button" data-act="p-stufe" data-i="${k}">+ Stufe nach einer Bearbeitung</button>` : ""}</div></div>`)).join("");
     const ohne = p.modelle.length ? "" : `<section class="karte"><h2 class="ktitel">Bauteile ohne 3D-Modell</h2>
         <div class="kglied"><button class="mini-btn" type="button" data-act="p-bauteile" data-d="-1" aria-label="Weniger Bauteile" ${p.bauteile <= 1 ? "disabled" : ""}>−</button>
         <span class="titel num" style="min-width:40px;text-align:center">${p.bauteile}</span>
@@ -2003,7 +2126,8 @@ a.btn { text-decoration: none; }
         <div class="kglied"><span class="knoten a">A</span><span class="rest text">Rückkehr</span></div></div>`;
       const tags = p.unterlagen.map(u => `<span class="tag">${esc(u.art)} · Index ${esc(u.index)}</span>`).join("");
       body = `<section class="karte"><p class="beschr">Auftrag</p><h2 class="ktitel">${esc(p.titel)}</h2><p class="neben">${p.stueckzahl} Stück · Termin ${fmtDatum(p.termin)} · ${bauteilZahl(p)} Bauteil${bauteilZahl(p) > 1 ? "e" : ""}</p></section>
-        ${p.modelle.length ? `<section class="karte"><p class="beschr">Bauteile</p><div class="modellreihe">${p.modelle.map(x => `<img src="${x.draufsicht}" alt="${esc(x.name)}">`).join("")}</div></section>` : ""}
+        ${p.modelle.length ? `<section class="karte"><p class="beschr">Bauteile</p><div class="modellreihe">${p.modelle.map(x => `<img src="${x.draufsicht}" alt="${esc(x.name)}">`).join("")}</div>
+          ${p.modelle.filter(x => (x.stufen || []).length).map(x => `<p class="neben">${esc(x.name)}: ${(x.stufen || []).length + 1} Stufen</p>`).join("")}</section>` : ""}
         ${p.baugruppen.length ? `<section class="karte"><p class="beschr">Baugruppen</p>${p.baugruppen.map(g => {
           const k = p.stationen.findIndex(q => q.key === pFuegt(p, g));
           return `<div class="zeile"><span class="rest"><span class="text">${esc(g.name)}</span><span class="neben">${g.teile.map(id => esc((p.modelle.find(x => x.id === id) || {}).name || "")).join(" + ")} · gefügt bei Station ${k + 1}</span></span></div>`;
@@ -2149,6 +2273,44 @@ a.btn { text-decoration: none; }
   }
   /* Draufsicht als Bild wie die übrigen Bauteile: weiße Fläche mit Rand in --line.
      Tiefer liegende Flächen etwas dunkler (zwischen --grey und --card), damit Stufen sichtbar sind. */
+  /* Zielumriss: Silhouette von oben, als orange Kontur mit zartem Grund. Gleicher Ausschnitt wie die Draufsicht. */
+  function kontur(m, maxPx) {
+    const rand = 3;
+    const s = (maxPx - 2 * rand) / Math.max(m.ext[0], m.ext[2], 1e-9);
+    const W = Math.max(2, Math.ceil(m.ext[0] * s)) + 2 * rand, H = Math.max(2, Math.ceil(m.ext[2] * s)) + 2 * rand;
+    const form = document.createElement("canvas");
+    form.width = W; form.height = H;
+    const f = form.getContext("2d");
+    f.fillStyle = "#000"; f.strokeStyle = "#000"; f.lineWidth = 0.8;
+    for (let i = 0; i < m.pos.length; i += 9) {
+      if (Math.abs(m.nor[i + 1]) < 0.02) continue;
+      f.beginPath();
+      for (let v = 0; v < 3; v++) {
+        const px = rand + (m.pos[i + v * 3] - m.min[0]) * s, py = rand + (m.pos[i + v * 3 + 2] - m.min[2]) * s;
+        if (v) f.lineTo(px, py); else f.moveTo(px, py);
+      }
+      f.closePath(); f.fill(); f.stroke();
+    }
+    const farbe = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    const out = document.createElement("canvas");
+    out.width = W; out.height = H;
+    const o = out.getContext("2d");
+    const d = 2.5;
+    [[-d, 0], [d, 0], [0, -d], [0, d], [-d, -d], [d, d], [-d, d], [d, -d]].forEach(([dx, dy]) => o.drawImage(form, dx, dy));
+    o.globalCompositeOperation = "source-in";
+    o.fillStyle = farbe("--accent"); o.fillRect(0, 0, W, H);
+    o.globalCompositeOperation = "destination-out";
+    o.drawImage(form, 0, 0);
+    o.globalCompositeOperation = "destination-over";
+    const grund = document.createElement("canvas");
+    grund.width = W; grund.height = H;
+    const g = grund.getContext("2d");
+    g.drawImage(form, 0, 0);
+    g.globalCompositeOperation = "source-in";
+    g.fillStyle = farbe("--accent-soft"); g.fillRect(0, 0, W, H);
+    o.globalAlpha = .45; o.drawImage(grund, 0, 0); o.globalAlpha = 1;
+    return out.toDataURL("image/png");
+  }
   function draufsicht(m, maxPx) {
     const rand = 3;
     const s = (maxPx - 2 * rand) / Math.max(m.ext[0], m.ext[2], 1e-9);
@@ -2230,7 +2392,7 @@ a.btn { text-decoration: none; }
     const m = bereiteModell(roh);
     const id = "M" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     MODELLE.set(id, m);
-    return { id, name: f.name.replace(/\.[^.]+$/, ""), datei: f.name, min: m.min, max: m.max, ext: m.ext, dreiecke: m.pos.length / 9, draufsicht: draufsicht(m, 256) };
+    return { id, name: f.name.replace(/\.[^.]+$/, ""), datei: f.name, min: m.min, max: m.max, ext: m.ext, dreiecke: m.pos.length / 9, draufsicht: draufsicht(m, 256), kontur: kontur(m, 256) };
   }
   const masse = ext => ext.map(v => (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10).toLocaleString("de-DE")).join(" × ");
 
@@ -2362,16 +2524,20 @@ a.btn { text-decoration: none; }
       anbinden(s, a) {
         slot = s;
         const b = a.bauteile.find(q => q.id === s.dataset.bt);
+        const stufe = b ? (stufenVon(a, b)[+s.dataset.bild || 0] || stufenVon(a, b)[0]) : null;
+        const mid = s.dataset.modell || (b && b.modell), bild = stufe ? stufe.draufsicht : "";
         if (!b || !start()) {
-          if (b) s.insertAdjacentHTML("afterbegin", `<img class="view3d" src="${b.draufsicht}" alt="${esc(b.name)}">`);
+          if (b) s.insertAdjacentHTML("afterbegin", `<img class="view3d" src="${bild}" alt="${esc(b.name)}">`);
           return;
         }
         s.insertBefore(cv, s.firstChild);
-        if (modellId !== b.modell) {
-          modellId = b.modell; m = null; yaw = -0.55; pitch = 0.5;
-          modellHolen(b.modell).then(d => {
-            if (modellId !== b.modell) return;
-            if (!d) { s.insertAdjacentHTML("afterbegin", `<img class="view3d" src="${b.draufsicht}" alt="${esc(b.name)}">`); return; }
+        if (modellId !== mid) {
+          const wechsel = modellId && m && b.modell !== undefined && stufenVon(a, b).some(q => q.modell === modellId);
+          modellId = mid; m = null;
+          if (!wechsel) { yaw = -0.55; pitch = 0.5; }
+          modellHolen(mid).then(d => {
+            if (modellId !== mid) return;
+            if (!d) { s.insertAdjacentHTML("afterbegin", `<img class="view3d" src="${bild}" alt="${esc(b.name)}">`); return; }
             m = d; hochladen(d); zeichne(); if (ui.kreismenue) renderKreis(cur());
           });
         } else zeichne();
@@ -2701,7 +2867,7 @@ a.btn { text-decoration: none; }
   function stationGebunden(a, uid) {
     const q = stUid(a, uid);
     if (!q) return false;
-    return a.anmerkungen.some(x => x.von === q.nr) || a.bauteile.some(b => b.entsteht === uid);
+    return a.anmerkungen.some(x => x.von === q.nr) || a.bauteile.some(b => b.entsteht === uid || (b.stufen || []).some(x => x.bei === uid));
   }
   function blattKette(a) {
     const K = ui.kette;
@@ -2825,7 +2991,7 @@ a.btn { text-decoration: none; }
     if (!b) return;
     const g = $(`#twin [data-bt="${bid}"]`);
     const von = g ? g.getBoundingClientRect() : null;
-    ui.bauteil = bid; ui.ebene = "bauteil"; schliesseAlles();
+    ui.bauteil = bid; ui.ebene = "bauteil"; ui.zielSicht = false; schliesseAlles();
     render();
     flip(von, $("#bpart") || $("#slot3d"), b.form === "modell" ? "g-twin" : "g-part" + (b.form === "rund" ? " rund" : ""));
   }
@@ -2874,7 +3040,7 @@ a.btn { text-decoration: none; }
   }
   function stelleAus(x, y) {
     if (ui.ebene === "bauteil") {
-      if ($("#slot3d")) { const h = Ansicht.treffer(x, y); return h ? { bauteil: ui.bauteil, stelle: h.stelle, punkt: h.punkt, normal: h.normal } : null; }
+      if ($("#slot3d")) { const h = Ansicht.treffer(x, y); return h ? { bauteil: ui.bauteil, stelle: h.stelle, punkt: h.punkt, normal: h.normal, modell: $("#slot3d").dataset.modell } : null; }
       const bp = $("#bpart");
       if (!bp) return null;
       const r = bp.getBoundingClientRect();
@@ -2896,7 +3062,7 @@ a.btn { text-decoration: none; }
   function oeffneKreis(x, y, ziehen) {
     const s = stelleAus(x, y);
     if (!s) return;
-    ui.kreismenue = { bauteil: s.bauteil, stelle: s.stelle, punkt: s.punkt || null, normal: s.normal || null, ziehen };
+    ui.kreismenue = { bauteil: s.bauteil, stelle: s.stelle, punkt: s.punkt || null, normal: s.normal || null, modell: s.modell || null, ziehen };
     ui.modus = null;
     render();
   }
@@ -2926,7 +3092,7 @@ a.btn { text-decoration: none; }
     if (!km) return;
     const alt = ui.neu && ui.neu.bauteil === km.bauteil && ui.neu.stelle === km.stelle ? ui.neu : null;
     ui.neu = Object.assign(alt || { foto: null, striche: [], memo: false, dauer: 0, audio: null, abschrift: "", satz: "" },
-      { art, bauteil: km.bauteil, stelle: km.stelle, punkt: km.punkt || null, normal: km.normal || null,
+      { art, bauteil: km.bauteil, stelle: km.stelle, punkt: km.punkt || null, normal: km.normal || null, modell: km.modell || null,
         bezug: alt && alt.bezug != null && erlaubt(a, art, alt.bezug, me) ? alt.bezug : null });
     ui.kreismenue = null; ui.blatt = "neu"; ui.blattHoehe = "voll";
     render();
@@ -2935,7 +3101,7 @@ a.btn { text-decoration: none; }
   function senden() {
     const a = cur(), d = ui.neu, me = meinNr(a);
     const x = anm({
-      id: "N" + Date.now().toString(36), art: d.art, von: me, bezug: d.bezug, bauteil: d.bauteil, stelle: d.stelle, punkt: d.punkt || null, normal: d.normal || null,
+      id: "N" + Date.now().toString(36), art: d.art, von: me, bezug: d.bezug, bauteil: d.bauteil, stelle: d.stelle, punkt: d.punkt || null, normal: d.normal || null, modell: d.modell || null,
       foto: d.foto ? fotoMitMarkierung() : null, audio: d.audio, dauer: d.dauer, abschrift: d.abschrift.trim(),
       heisstFuer: "", zeit: jetztIso(), gelesenVon: [state.ich], offen: d.art === "frage", wirdGesendet: !navigator.onLine
     });
@@ -3053,20 +3219,24 @@ a.btn { text-decoration: none; }
     const fertig = p.modelle.filter(x => !x.laedt);
     if (!fertig.length) return layout(p.bauteile, stationen);
     if (fertig.length > 1 && reiheMassstab(fertig, true) > reiheMassstab(fertig, false) * 1.05) {
-      fertig.forEach(x => {
-        const m = MODELLE.get(x.id);
+      fertig.forEach(x => [x].concat(x.stufen || []).forEach(y => {
+        const m = MODELLE.get(y.id);
         if (!m) return;
         const g = drehe90(m);
-        MODELLE.set(x.id, g);
-        Object.assign(x, { min: g.min, max: g.max, ext: g.ext, draufsicht: draufsicht(g, 256) });
-      });
+        MODELLE.set(y.id, g);
+        Object.assign(y, { min: g.min, max: g.max, ext: g.ext, draufsicht: draufsicht(g, 256), kontur: kontur(g, 256) });
+      }));
     }
-    const lage = packe(fertig), idVonModell = {};
+    const lage = packe(fertig.map(x => ({ ext: platzExt({ ext: x.ext, stufen: x.stufen }) }))), idVonModell = {};
     const teile = fertig.map((x, i) => {
       IDB.legen(x.id, MODELLE.get(x.id));
       idVonModell[x.id] = "B" + (i + 1);
       return { id: "B" + (i + 1), name: x.name.trim() || "Bauteil " + (i + 1), x: lage[i].x, y: lage[i].y, w: lage[i].w, h: lage[i].h,
-        form: "modell", modell: x.id, draufsicht: x.draufsicht, min: x.min, max: x.max, ext: x.ext, entsteht: uidVonKey(pEntsteht(p, x)) };
+        form: "modell", modell: x.id, draufsicht: x.draufsicht, kontur: x.kontur, min: x.min, max: x.max, ext: x.ext, entsteht: uidVonKey(pEntsteht(p, x)),
+        stufen: (x.stufen || []).filter(y => !y.laedt).map((y, n) => {
+          IDB.legen(y.id, MODELLE.get(y.id));
+          return { modell: y.id, draufsicht: y.draufsicht, kontur: y.kontur, min: y.min, max: y.max, ext: y.ext, bei: uidVonKey(pStufeBei(p, x, (x.stufen || []).indexOf(y))) };
+        }) };
     });
     const gruppen = p.baugruppen.filter(g => !g.laedt && g.teile.length >= 2).map((g, i) => {
       IDB.legen(g.id, MODELLE.get(g.id));
@@ -3078,9 +3248,27 @@ a.btn { text-decoration: none; }
   async function ladeModelle(dateien) {
     const p = ui.projekt;
     const alsGruppe = p.modellZiel === "gruppe";
+    const stufeVon = String(p.modellZiel).indexOf("stufe:") === 0 ? p.modelle[+p.modellZiel.slice(6)] : null;
     p.modellZiel = "teil";
     for (const f of dateien) {
       const platz = { laedt: true, name: f.name.replace(/\.[^.]+$/, "") };
+      if (stufeVon) {
+        stufeVon.stufen = stufeVon.stufen || [];
+        stufeVon.stufen.push(platz);
+        render();
+        await new Promise(r => setTimeout(r, 30));
+        try {
+          const x = await leseModellDatei(f);
+          Object.assign(platz, x, { laedt: false, bei: "" });
+          platz.bei = pStufeBei(p, stufeVon, stufeVon.stufen.indexOf(platz));
+          p.unterlagen.push({ name: f.name, art: "3D-Modell", index: "A", station: "", modell: x.id, datei: f });
+        } catch (err) {
+          stufeVon.stufen.splice(stufeVon.stufen.indexOf(platz), 1);
+          toast(err && err.message ? err.message : `${f.name}: Die Datei ließ sich nicht lesen.`);
+        }
+        if (ui.projekt === p) render();
+        continue;
+      }
       if (alsGruppe) {
         Object.assign(platz, { teile: [], fuegt: "" });
         p.baugruppen.push(platz);
@@ -3342,11 +3530,18 @@ a.btn { text-decoration: none; }
       case "p-modell": $("#modellInput").click(); break;
       case "p-modell-weg": {
         const x = ui.projekt.modelle.splice(+el.dataset.i, 1)[0];
+        if (x) (x.stufen || []).forEach(st => { MODELLE.delete(st.id); ui.projekt.unterlagen = ui.projekt.unterlagen.filter(u => u.modell !== st.id); });
         if (x) { MODELLE.delete(x.id); ui.projekt.unterlagen = ui.projekt.unterlagen.filter(u => u.modell !== x.id); ui.projekt.baugruppen.forEach(g => { g.teile = g.teile.filter(m => m !== x.id); }); }
         render(); break;
       }
       case "p-dok-weg": ui.projekt.unterlagen.splice(+el.dataset.i, 1); render(); break;
       case "p-gruppe": ui.projekt.modellZiel = "gruppe"; $("#modellInput").click(); break;
+      case "p-stufe": ui.projekt.modellZiel = "stufe:" + el.dataset.i; $("#modellInput").click(); break;
+      case "p-stufe-weg": {
+        const x = ui.projekt.modelle[+el.dataset.i], st = x.stufen.splice(+el.dataset.k, 1)[0];
+        if (st) { MODELLE.delete(st.id); ui.projekt.unterlagen = ui.projekt.unterlagen.filter(u => u.modell !== st.id); }
+        render(); break;
+      }
       case "p-gruppe-teil": {
         const g = ui.projekt.baugruppen[+el.dataset.i], m = el.dataset.m;
         g.teile = g.teile.includes(m) ? g.teile.filter(x => x !== m) : g.teile.concat(m);
@@ -3359,6 +3554,7 @@ a.btn { text-decoration: none; }
       }
       case "auftragstext": ui.dokVon = ui.blatt === "unterlagen" ? "unterlagen" : null; ui.dokument = "L:" + el.dataset.nr; ui.blatt = "dokument"; ui.blattHoehe = "voll"; render(); break;
       case "kette-auf": oeffneKette(); break;
+      case "stufe-zeigen": ui.zielSicht = el.dataset.z === "1"; render(); break;
       case "kette-werk": ui.kette.liste.push({ uid: null, werkstatt: el.dataset.w, leistung: "" }); ui.kette.waehlen = false; render(); break;
       case "kette-waehlen": ui.kette.waehlen = !ui.kette.waehlen; render(); break;
       case "kette-hoch": case "kette-runter": {
@@ -3410,6 +3606,8 @@ a.btn { text-decoration: none; }
       if (obj === "antwort") { const b = $("#antwortSenden"); if (b) b.disabled = !(ui.antwort.memo || ui.antwort.text.trim()); }
     } else if (t.dataset.pm && ui.projekt) {
       ui.projekt.modelle[+t.dataset.i][t.dataset.pm] = t.value;
+    } else if (t.dataset.pst && ui.projekt) {
+      ui.projekt.modelle[+t.dataset.i].stufen[+t.dataset.k][t.dataset.pst] = t.value;
     } else if (t.dataset.ps && ui.projekt) {
       ui.projekt.stationen[+t.dataset.i][t.dataset.ps] = t.value;
     } else if (t.dataset.pg && ui.projekt) {
@@ -3426,6 +3624,7 @@ a.btn { text-decoration: none; }
     if (t.dataset.pd && ui.projekt) { ui.projekt.unterlagen[+t.dataset.i][t.dataset.pd] = t.value; return; }
     if (t.dataset.pm && ui.projekt && t.tagName === "SELECT") { ui.projekt.modelle[+t.dataset.i][t.dataset.pm] = t.value; return; }
     if (t.dataset.pg && ui.projekt && t.tagName === "SELECT") { ui.projekt.baugruppen[+t.dataset.i][t.dataset.pg] = t.value; return; }
+    if (t.dataset.pst && ui.projekt && t.tagName === "SELECT") { ui.projekt.modelle[+t.dataset.i].stufen[+t.dataset.k][t.dataset.pst] = t.value; return; }
     if (t.id === "leerOk") { const b = $("#freigebenBtn"); if (b) b.disabled = !t.checked; return; }
     if (t.id === "fotoInput" && t.files && t.files[0] && ui.neu) {
       if (ui.neu.foto) URL.revokeObjectURL(ui.neu.foto);
@@ -3896,7 +4095,7 @@ a.btn { text-decoration: none; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261123101534";
+  const BUILD = "20261123105805";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
