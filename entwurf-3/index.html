@@ -1327,11 +1327,13 @@ a.btn { text-decoration: none; }
     LAGE.set(schluessel, m);
     return m;
   }
-  /* Stationen, die ein Bauteil durchläuft: Einzelteil bis zum Fügen, Baugruppe ab dem Fügen */
+  /* Stationen, die ein Bauteil durchläuft: ab der Station, an der es entsteht (beigelegte Teile ab Station 1),
+     Einzelteile bis zum Fügen, Baugruppen ab dem Fügen */
   function verlaufVon(a, b) {
     const g = b.art === "baugruppe" ? null : gruppeVon(a, b);
     const bis = g ? (stUid(a, g.entsteht) || {}).nr || Infinity : Infinity;
-    const ab = b.art === "baugruppe" ? (stUid(a, b.entsteht) || {}).nr || 1 : 1;
+    const start = b.entsteht && b.entsteht !== "AG" ? stUid(a, b.entsteht) : null;
+    const ab = start ? start.nr : 1;
     return a.stationen.filter(q => q.nr >= ab && q.nr <= bis).map(q => q.nr);
   }
   function entstehungText(a, b) {
@@ -4253,7 +4255,7 @@ a.btn { text-decoration: none; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261123121213";
+  const BUILD = "20261123123301";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
