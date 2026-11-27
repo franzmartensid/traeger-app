@@ -776,10 +776,24 @@ body { font-variant-numeric: tabular-nums; }
 @keyframes teil-puls { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 @media (prefers-reduced-motion: reduce) { .twin g.mein.aktiv, .twin g.entsteht, .twin g.bearbeiten { animation: none !important; } }
 .twin .trenner { stroke: var(--line); }
-.teil-marke { position: absolute; z-index: 1; transform: translateY(-50%); pointer-events: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;
+.teil-marke { position: absolute; z-index: 1; transform: translate(-50%, calc(-100% - 6px)); pointer-events: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;
   padding: 2px 8px 2px 6px; border-radius: 6px; background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); font: 600 12px/16px var(--font); }
 .teil-marke i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); flex: 0 0 auto; }
 .teil-marke.aktiv i { background: var(--accent); }
+/* Eigener Schritt: großer Kreis neben dem Verfahren, derselbe Kreis in der Kette und im Verlauf */
+.kopf-l > .titelzeile { order: 1; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.titelzeile .titel { margin: 0; min-width: 0; }
+.schritt-kreis { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 700 19px/1 var(--font);
+  background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 2.5px var(--ink); }
+.schritt-kreis.n-jetzt { background: var(--accent); color: #fff; box-shadow: none; }
+.schritt-kreis.n-fertig { background: var(--ink); color: var(--surface); box-shadow: none; }
+.schritt-kreis.n-lieferung { box-shadow: none; border: 2px dashed var(--accent); }
+.tl-node.n-mein span { width: 36px; height: 36px; font: 700 15px/1 var(--font); }
+.tl-node.n-mein.n-offen span, .knoten.n-mein.n-offen { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 2.5px var(--ink); }
+.tl-node.n-mein.n-lieferung span { border-width: 2px; }
+.vrow .rest { display: grid; gap: 1px; }
+.vrow .vname { font: 400 13px/1.25 var(--font); color: var(--grey); }
+.verlauf .vrow.nebenher .vname { color: var(--soft-grey); }
 /* Arbeitsgang: eigene Notizen */
 .zeile.notiz .text { white-space: pre-wrap; }
 /* Zustand mit Stand je Station: was bestätigt ist, was aussteht */
@@ -1825,7 +1839,7 @@ body { font-variant-numeric: tabular-nums; }
     const g = b.art === "baugruppe" ? null : gruppeVon(a, b);
     return g && g.entsteht === q.uid ? "Fügen" : null;
   }
-  /* Schild mit der Tätigkeit an jedem Bauteil der Werkstatt, oben links am Bauteil */
+  /* Schild mit der Tätigkeit an jedem Bauteil der Werkstatt, mittig über dem Bauteil */
   function teilMarken(a, v) {
     const me = istWerk() ? meinNr(a) : null, q = me != null ? st(a, me) : null;
     if (!q || q.status === "abgeschlossen") return "";
@@ -1833,8 +1847,11 @@ body { font-variant-numeric: tabular-nums; }
     return zwillingTeile(a, v).map(b => {
       const auf = teilAufgabe(a, b, q), P = lage.get(b.id);
       if (!auf || !P) return "";
-      const L = stufenRect(b, vorhanden(a, b, v) ? aktuelleStufe(a, b, v) : stufenVon(a, b)[0], P);
-      return `<span class="teil-marke${aktiv ? " aktiv" : ""}" style="left:${L.x}%;top:${L.y}%"><i></i>${auf}</span>`;
+      const stufe = vorhanden(a, b, v) ? aktuelleStufe(a, b, v) : stufenVon(a, b)[0], L = stufenRect(b, stufe, P);
+      const w = L.w, h = L.h * .8, mid = b.form === "modell" ? stufe && stufe.modell : koerperId(b, w, h);
+      const r = mid ? Ansicht.standRahmen(mid, Math.max(8, Math.round(w * 8)), Math.max(8, Math.round(h * 8))) : null;
+      const x = klemme(L.x + L.w / 2, 13, 87), y = Math.max(L.y + (r ? r.y0 : 0) * L.h, 10);
+      return `<span class="teil-marke${aktiv ? " aktiv" : ""}" style="left:${x}%;top:${y}%"><i></i>${auf}</span>`;
     }).join("");
   }
   const entscheidungText = x => (x.traegt === "kette" ? "Kette wird geändert" : `Station ${x.traegt} trägt die Anpassung`);
@@ -1949,7 +1966,7 @@ body { font-variant-numeric: tabular-nums; }
     }
     const me = meinNr(a), s = st(a, me), w = WERK[s.werkstatt];
     const z = schrittStand(a, me);
-    return `<div class="head"><div class="kopf-l"><h1 class="titel">${esc(w.verfahren)}</h1><p class="neben">${feld("Auftrag", a.id)}${feld("Station", `${me} von ${anzahl(a)}`)}</p></div><div class="kopf-r"><span class="pill ${STAND_KLASSE[z]}">${z}</span></div></div>`;
+    return `<div class="head"><div class="kopf-l"><div class="titelzeile"><h1 class="titel">${esc(w.verfahren)}</h1><span class="schritt-kreis ${knotenKlasse(a, me, jetzt(a))}" aria-label="Station ${me} von ${anzahl(a)}">${me}</span></div><p class="neben">${feld("Auftrag", a.id)}</p></div><div class="kopf-r"><span class="pill ${STAND_KLASSE[z]}">${z}</span></div></div>`;
   }
 
   function logistikStand(L) {
@@ -2027,7 +2044,7 @@ body { font-variant-numeric: tabular-nums; }
     const ziel = ui.blatt === "uebergabe" ? j + 1 : null;
     let knoten = "";
     for (let nr = 0; nr <= E; nr++) {
-      knoten += `<button class="tl-node ${knotenKlasse(a, nr, j)}" type="button" style="left:${pos(nr)}" data-act="tl" data-nr="${nr}" aria-label="${esc(knotenAria(a, nr, j))}"><span>${knotenText(a, nr)}</span></button>`;
+      knoten += `<button class="tl-node ${knotenKlasse(a, nr, j)}${istWerk() && nr === meinNr(a) ? " n-mein" : ""}" type="button" style="left:${pos(nr)}" data-act="tl" data-nr="${nr}" aria-label="${esc(knotenAria(a, nr, j))}"><span>${knotenText(a, nr)}</span></button>`;
     }
     return `<div class="tl" id="tl" data-e="${E}" role="group" aria-label="Zeitleiste der Stationen">
       <div class="tl-track"><i style="width:${(Math.min(ziel != null ? ziel : j, E) / E) * 100}%"></i></div>
@@ -2062,8 +2079,8 @@ body { font-variant-numeric: tabular-nums; }
       const chips = a.anmerkungen.filter(x => x.bauteil === b.id && x.von === nr && darfSehen(a, x)).map(x => chip(x.art, "s")).join("");
       const nebenher = !betrifft(a, b, st(a, nr));
       return `<button class="vrow${nebenher ? " nebenher" : ""}" type="button" data-act="rueckblick" data-nr="${nr}" aria-label="${kurzName(a, nr)}, ${esc(werkVon(a, nr).verfahren)}${nebenher ? ", betrifft dieses Bauteil nicht" : ""}">
-        <span class="knoten ${knotenKlasse(a, nr, j)}">${nr}</span>
-        <span class="rest text">${esc(werkVon(a, nr).verfahren)}</span>
+        <span class="knoten ${knotenKlasse(a, nr, j)}${istWerk() && nr === meinNr(a) ? " n-mein" : ""}">${nr}</span>
+        <span class="rest"><span class="text">${esc(werkVon(a, nr).verfahren)}</span><span class="vname">${esc(werkVon(a, nr).name)}</span></span>
         ${nr === j ? '<span class="tl-jetzt" style="position:static;transform:none">jetzt</span>' : ""}
         <span class="chips">${chips}</span></button>`;
     }).join("");
@@ -2071,6 +2088,7 @@ body { font-variant-numeric: tabular-nums; }
       ? `<button class="anm-knopf" id="fab" type="button" data-act="plus"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12" style="stroke:currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>${a.vorbereitung ? "Rückfrage" : "Melden"}</button>` : "";
     const eigene = L.map(x => x.modell), alle = [].concat.apply([], a.bauteile.map(q => stufenVon(a, q).map(x => x.modell)));
     const doks = a.unterlagen.filter(u => !u.modell || eigene.includes(u.modell) || !alle.includes(u.modell));
+    const mitDoks = !istWerk() || betrifft(a, b, meinNr(a) != null ? st(a, meinNr(a)) : null);
     return `<div class="head"><div class="kopf-l"><button class="textbtn" type="button" data-act="ebene" data-ebene="traeger" style="min-height:32px">‹ Träger ${a.id}</button>
         <h1 class="titel">${esc(b.name)}</h1></div></div>
       ${umschalter}
@@ -2078,7 +2096,7 @@ body { font-variant-numeric: tabular-nums; }
         ? `<div class="bwell-rahmen"><div class="bwell b3d${ziel && ui.zielSicht ? " ziel-sicht" : ""}" id="slot3d" data-twin="bauteil3d" data-bt="${b.id}" data-modell="${gezeigt.modell}" data-bild="${gk}" role="group" aria-label="3D-Modell ${esc(b.name)}${ziel && ui.zielSicht ? ", nach der Bearbeitung" : ""}">${pins3d}</div>${anmKnopf}</div>`
         : `<div class="bwell-rahmen"><div class="bwell"><div class="bpart${b.form === "rund" ? " rund" : ""}" id="bpart" data-twin="bauteil" style="aspect-ratio:${verhaeltnis};${groesse}">${pins}</div></div>${anmKnopf}</div>`}
       <section class="karte"><h2 class="ktitel">Verlauf</h2><div class="verlauf">${zeilen}</div></section>
-      <section class="karte"><h2 class="ktitel">Unterlagen</h2>${dokZeilen(doks) || '<p class="leer">Keine Unterlagen</p>'}</section>
+      ${mitDoks ? `<section class="karte"><h2 class="ktitel">Unterlagen</h2>${dokZeilen(doks) || '<p class="leer">Keine Unterlagen</p>'}</section>` : ""}
       <div class="platz"></div>`;
   }
 
@@ -3049,8 +3067,15 @@ body { font-variant-numeric: tabular-nums; }
       const vx = R[0][0] * p[0] + R[0][1] * p[1] + R[0][2] * p[2], vy = R[1][0] * p[0] + R[1][1] * p[1] + R[1][2] * p[2];
       return { x: (W / 2 + (vx - k.cx) * k.s) / W, y: (H / 2 - (vy - k.cy) * k.s) / H };
     }
+    /* Oberkante und Unterkante des Bauteils im Standbild, als Anteil der Höhe */
+    function standRahmen(id, W, H) {
+      const mm = MODELLE.get(id);
+      if (!mm || !mm.pos) return null;
+      const k = standKamera(mm, W, H), h = HUELLE.get(mm);
+      return { y0: (H / 2 - (h.y1 - k.cy) * k.s) / H, y1: (H / 2 - (h.y0 - k.cy) * k.s) / H };
+    }
     return {
-      standbild, standPunkt,
+      standbild, standPunkt, standRahmen,
       anbinden(s, a) {
         slot = s;
         const b = a.bauteile.find(q => q.id === s.dataset.bt);
@@ -4839,7 +4864,7 @@ body { font-variant-numeric: tabular-nums; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261127173132";
+  const BUILD = "20261127183222";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
