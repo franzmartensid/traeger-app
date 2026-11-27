@@ -743,32 +743,21 @@ body { font-variant-numeric: tabular-nums; }
 
 /* =========================================================================
    Fokus: die eine Übergabe, die jetzt ansteht, wie in der Zeile „Träger-Anwendung“
-   des Prozessablaufs. Stärkster Kontrast der Seite, genau einmal.
-   Darunter weitere Aufgaben als Zeilen, Zustände ruhig, der Hintergrund grau.
+   des Prozessablaufs. Eine Zeile, wer beteiligt ist, darunter der Hauptknopf.
+   Weitere Aufgaben als Zeilen, Zustände ruhig, der Hintergrund grau überschrieben.
    ========================================================================= */
-.fokus { background: var(--ink); color: var(--surface); border-radius: 12px; padding: 14px 16px 16px; margin: 2px 0 16px; display: grid; }
-.f-fluss { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0; font: 600 13px/1 var(--font); }
-.f-akteur { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 6px; box-shadow: inset 0 0 0 1.2px var(--grey); color: var(--line); }
-.f-akteur.ich { background: var(--accent); box-shadow: none; color: var(--ink); }
-.f-pfeil { color: var(--soft-grey); font-size: 16px; }
-.f-auftrag { margin-left: auto; color: var(--soft-grey); }
-.f-info { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; font: 500 14px/1.3 var(--font); color: var(--soft-grey); }
-.f-titel { margin: 0; font: 700 28px/1.08 "Barlow Semi Condensed", var(--font); color: var(--surface); }
-.f-text { margin: 4px 0 0; font: 500 15px/1.35 var(--font); color: var(--line); }
-.f-inhalt { margin: 10px 0 0; padding-left: 10px; border-left: 2px solid var(--grey); font: 400 15px/1.4 var(--font); color: var(--surface); }
-.fokus .f-knopf { margin-top: 16px; background: var(--surface); color: var(--ink); box-shadow: none; font-weight: 700; }
-.fokus .f-zweit { color: var(--surface); justify-self: center; min-height: 44px; margin-top: 4px; }
-.fokus :focus-visible { outline-color: var(--accent); }
+.fokus { display: grid; gap: 8px; margin: 2px 0 18px; }
+.f-fluss { display: flex; align-items: center; gap: 8px; margin: 0; font: 500 14px/1.3 var(--font); color: var(--grey); }
+.f-punkt { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: 0 0 auto; }
+.fokus .f-knopf { height: 58px; font-size: 18px; }
+.fokus .f-zweit { justify-self: center; min-height: 40px; }
 /* Zustand: nur Auskunft, ruhig */
-.zustand { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; margin: 2px 0 16px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px;
+.zustand { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; margin: 2px 0 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-taste);
   background: transparent; color: var(--ink); font: inherit; }
 .zustand .chip { flex: 0 0 auto; }
 .z-rest { display: grid; gap: 2px; min-width: 0; }
-.z-titel { font: 700 18px/1.2 var(--font); }
+.z-titel { font: 600 16px/1.25 var(--font); }
 .z-text { font: 400 14px/1.35 var(--font); color: var(--grey); }
-.z-leer { width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--line); }
-/* Zeilen: Aufgaben zeigen ihre Handlung rechts, Zustände treten zurück */
-.z-knopf { flex: 0 0 auto; font: 600 13px/1 var(--font); color: var(--ink); border-radius: 6px; padding: 8px 10px; box-shadow: inset 0 0 0 1.2px var(--part-line); }
 .zeile.ruhig .text { color: var(--grey); font-weight: 500; }
 /* Hintergrund: Aufträge und Arbeitsschritte, grau überschrieben */
 .karte.hintergrund > .ktitel:first-child { font: 600 14px/1.3 var(--font); color: var(--grey); }
@@ -1755,7 +1744,7 @@ body { font-variant-numeric: tabular-nums; }
       if (a.vorbereitung && !offeneStopps(a).length) t(3, { von: "Sie", an: `Logistik, Station 1`, info: "Auftrag freigeben, Träger abholbereit",
         titel: "Durchlauf starten", kontext: `${anzahl(a)} Stationen, keine Rückfrage offen`, knopf: "Starten", act: "durchlauf-starten" });
       if (a.zurueck && !a.abgeschlossen) t(4, { von: "Alle Stationen", an: "Sie", info: "Gesammelte Meldungen und Serie",
-        titel: "Auswertung", kontext: `${a.anmerkungen.length} Meldungen, davon ${a.anmerkungen.filter(x => x.art === "serie").length} Serie`, knopf: "Auswerten", act: "unterlagen-auf" });
+        titel: "Auswerten", kontext: `${a.anmerkungen.length} Meldungen, davon ${a.anmerkungen.filter(x => x.art === "serie").length} Serie`, knopf: "Auswerten", act: "unterlagen-auf" });
       if (a.abgeschlossen && !a.freigegeben) t(5, { von: "Sie", an: "Netzwerk", info: "Träger frei für den nächsten Auftrag",
         titel: "Träger freigeben", kontext: `Träger ${a.traeger}, Unterlagen übernommen`, knopf: "Freigeben", act: "unterlagen-auf" });
       return L.sort((p, q) => p.rang - q.rang);
@@ -1765,12 +1754,12 @@ body { font-variant-numeric: tabular-nums; }
     const s = st(a, me), w = werkVon(a, me), Lg = a.logistik;
     a.anmerkungen.forEach(x => {
       if (x.art === "stopp" && rolleVon(a, x.von) === ich) {
-        if (x.offen) t(2, { zustand: true, art: "stopp", titel: `${artName(x)} offen`, kontext: "Wartet auf Antwort des Auftraggebers", act: "pin", id: x.id });
+        if (x.offen) t(2, { zustand: true, art: "stopp", titel: "Wartet auf Antwort", kontext: "", act: "pin", id: x.id });
         else if (antwortUngelesen(a, x)) t(1, { art: "stopp", von: "Auftraggeber", an: "Sie", info: `Antwort zu ${artName(x)}`, titel: "Antwort lesen", kontext: meldungInhalt(a, x),
           inhalt: (x.antworten[x.antworten.length - 1] || {}).abschrift || "", knopf: "Öffnen", act: "pin", id: x.id });
       }
       if (x.art === "entscheidung" && beteiligt(a, x, ich)) {
-        if (x.offen) t(4, { zustand: true, art: "entscheidung", titel: "Entscheidung ausstehend", kontext: `Station ${x.von} → Station ${x.bezug}`, act: "pin", id: x.id });
+        if (x.offen) t(4, { zustand: true, art: "entscheidung", titel: "Entscheidung ausstehend", kontext: "", act: "pin", id: x.id });
         else if (anmUngelesen(a, x) || antwortUngelesen(a, x)) t(1, { art: "entscheidung", von: "Auftraggeber", an: "Sie", info: "Entscheidung", titel: "Entscheidung lesen", kontext: `Station ${x.traegt} trägt die Anpassung`, knopf: "Öffnen", act: "pin", id: x.id });
       }
     });
@@ -1782,28 +1771,27 @@ body { font-variant-numeric: tabular-nums; }
       if (Lg && Lg.nach === me && Lg.status === "zugestellt") t(0, { von: "Sie", an: "Auftraggeber", info: "Status: angenommen", titel: "Träger annehmen", kontext: `Zugestellt um ${fmtUhr(Lg.zugestellt)}`, knopf: "Annehmen", act: "annehmen-auf" });
       else t(6, { zustand: true, titel: "In Zustellung", kontext: Lg && Lg.nach === me ? logistikStand(Lg) : "Abholung ausstehend" });
     } else if (s.status === "in-arbeit") t(6, { von: "Sie", an: me + 1 <= anzahl(a) ? `Logistik, Station ${me + 1}` : "Logistik, Auftraggeber", info: "Schritt fertig, Träger abholbereit", titel: "Schritt abschließen", kontext: `${w.verfahren}, Station ${me} von ${anzahl(a)}`, knopf: "Abschließen", act: "fertigstellen" });
-    else if (s.status === "geplant") t(7, { zustand: true, titel: "Geplant", kontext: `Station ${me} von ${anzahl(a)}. Aktuell: ${positionText(a)}` });
-    else t(8, { zustand: true, titel: "Abgeschlossen", kontext: Lg && Lg.von === me ? `Logistik benachrichtigt, Ziel: ${ort(a, Lg.nach).name}` : s.fertig ? `Am ${fmt(s.fertig)}` : "" });
+    else if (s.status === "geplant") t(7, { zustand: true, titel: "Geplant", kontext: `Aktuell: ${positionText(a)}` });
+    else t(8, { zustand: true, titel: "Abgeschlossen", kontext: Lg && Lg.von === me ? logistikStand(Lg) : "" });
     return L.sort((p, q) => p.rang - q.rang);
   }
   const datenVon = t => (t.act ? `data-act="${t.act}"${t.id ? ` data-id="${t.id}"` : ""}${t.a ? ` data-auftrag="${t.a.id}"` : ""}` : "");
-  /* Fokus: die eine Handlung, die jetzt ansteht. Stärkster Kontrast der Seite, genau einmal. */
+  const richtung = t => (!t.von ? "" : t.von === "Sie" ? (t.an && t.an !== "Netzwerk" ? `An ${t.an}` : "") : t.von === "Alle Stationen" ? "Von allen Stationen" : `Von ${t.von}`);
+  /* Fokus: die eine Übergabe, die jetzt ansteht. Eine Zeile, wer beteiligt ist, darunter die Handlung als Hauptknopf. */
   function fokusHtml(t, mitAuftrag) {
     if (t.zustand) {
-      const innen = `${t.art ? chip(t.art, "m") : '<span class="z-leer"></span>'}<span class="z-rest"><span class="z-titel">${esc(t.titel)}</span><span class="z-text">${esc(t.kontext)}</span></span>`;
+      const innen = `${t.art ? chip(t.art, "s") : ""}<span class="z-rest"><span class="z-titel">${esc(t.titel)}</span>${t.kontext ? `<span class="z-text">${esc(t.kontext)}</span>` : ""}</span>`;
       return t.act ? `<button class="zustand" type="button" ${datenVon(t)}>${innen}</button>` : `<div class="zustand">${innen}</div>`;
     }
-    const akteur = n => `<span class="f-akteur${n === "Sie" ? " ich" : ""}">${esc(n)}</span>`;
-    return `<section class="fokus"><p class="f-fluss">${akteur(t.von)}<span class="f-pfeil" aria-label="an">→</span>${akteur(t.an)}${mitAuftrag && t.a ? `<span class="f-auftrag">${t.a.id}</span>` : ""}</p>
-      <p class="f-info">${t.art ? chip(t.art, "s") : ""}<span>${esc(t.info)}</span></p>
-      <h2 class="f-titel">${esc(t.titel)}</h2>${t.kontext ? `<p class="f-text">${esc(t.kontext)}</p>` : ""}${t.inhalt ? `<p class="f-inhalt">${esc(t.inhalt)}</p>` : ""}
-      <button class="btn block f-knopf" type="button" ${datenVon(t)}>${t.knopf}</button>
+    const zeile = [mitAuftrag && t.a ? t.a.id : "", richtung(t)].filter(Boolean).join(", ");
+    return `<section class="fokus">${zeile ? `<p class="f-fluss">${t.art ? chip(t.art, "s") : '<i class="f-punkt"></i>'}<span>${esc(zeile)}</span></p>` : ""}
+      <button class="btn pri block f-knopf" type="button" ${datenVon(t)}>${esc(t.titel)}</button>
       ${t.knopf2 ? `<button class="textbtn f-zweit" type="button" data-act="${t.act2}"${t.a ? ` data-auftrag="${t.a.id}"` : ""}>${t.knopf2}</button>` : ""}</section>`;
   }
-  /* Weitere Aufgaben als Zeile: die Handlung steht rechts, Zustände treten zurück */
+  /* Weitere Aufgaben als Zeile; Zustände treten zurück */
   function aufgabeZeile(t, mitAuftrag) {
-    const innen = `${t.art ? chip(t.art, "s") : '<span class="z-leer"></span>'}<span class="rest"><span class="text">${esc(t.titel)}</span>
-      <span class="neben">${esc((mitAuftrag && t.a ? t.a.id + ", " : "") + (t.von ? `${t.von} → ${t.an}: ${t.art ? t.inhalt || t.kontext : t.info}` : t.kontext))}</span></span>${t.knopf ? `<span class="z-knopf">${t.knopf}</span>` : ""}`;
+    const unter = [mitAuftrag && t.a ? t.a.id : "", t.zustand ? t.kontext : richtung(t)].filter(Boolean).join(", ");
+    const innen = `${t.art ? chip(t.art, "s") : ""}<span class="rest"><span class="text">${esc(t.titel)}</span>${unter ? `<span class="neben">${esc(unter)}</span>` : ""}</span>`;
     return t.act ? `<button class="zeile${t.zustand ? " ruhig" : ""}" type="button" ${datenVon(t)}>${innen}</button>` : `<div class="zeile ruhig">${innen}</div>`;
   }
 
@@ -1813,12 +1801,12 @@ body { font-variant-numeric: tabular-nums; }
     const alle = [].concat(...liste.map(a => aufgabenVon(a)));
     const tun = alle.filter(t => !t.zustand).sort((p, q) => p.rang - q.rang);
     /* Zustände zu Meldungen (Stop offen, Entscheidung ausstehend) stehen ruhig unter den Aufgaben */
-    const ruhe = alle.filter(t => t.zustand && t.act).map(t => aufgabeZeile(t, true));
+    const ruhe = alle.filter(t => t.zustand && t.act).map(t => aufgabeZeile(t, liste.length > 1));
     if (ag && !liste.length) tun.push({ rang: 9, von: "Sie", an: "Alle Betriebe", info: "Auftrag und digitaler Zwilling, an den Träger gekoppelt", titel: "Auftrag anlegen", kontext: "Träger koppeln, Stationen und Bauteile festlegen", knopf: "Anlegen", act: "projekt-neu" });
     let hinter;
     if (ag) {
-      hinter = liste.map(a => `<button class="zeile" type="button" data-act="oeffne-traeger" data-id="${a.id}"><span class="rest"><span class="text">${esc(a.titel)}</span>
-          <span class="neben">${feld("Auftrag", a.id)}${esc(positionText(a))}</span></span>${pillAuftrag(a)}</button>`).join("")
+      hinter = liste.map(a => { const j = jetzt(a); return `<button class="zeile" type="button" data-act="oeffne-traeger" data-id="${a.id}"><span class="rest"><span class="text">${esc(a.titel)}</span>
+          <span class="neben">${a.id}${!a.zurueck && j >= 1 && j <= anzahl(a) ? `, Station ${j} von ${anzahl(a)}` : ""}</span></span>${pillAuftrag(a)}</button>`; }).join("")
         + (liste.length ? `<button class="btn umriss block" type="button" data-act="projekt-neu" style="margin-top:10px">Neuer Auftrag</button>` : "");
     } else {
       const rang = { Zugestellt: 0, "In Arbeit": 1, Gestoppt: 1, "Rückfrage offen": 2, Vorbereitung: 2, "In Zustellung": 3, Geplant: 4, Abgeschlossen: 5 };
@@ -1826,55 +1814,28 @@ body { font-variant-numeric: tabular-nums; }
       liste.forEach(a => a.stationen.filter(q => q.werkstatt === state.ich).forEach(q => {
         const z = schrittStand(a, q.nr);
         zeilen.push([rang[z], `<button class="zeile" type="button" data-act="oeffne-traeger" data-id="${a.id}"><span class="knoten-klein">${q.nr}</span>
-          <span class="rest"><span class="text">${esc(WERK[q.werkstatt].verfahren)}, ${esc(a.titel)}</span><span class="neben">${feld("Auftrag", a.id)}${feld("Station", `${q.nr} von ${anzahl(a)}`)}</span></span>
+          <span class="rest"><span class="text">${esc(a.titel)}</span><span class="neben">${a.id}, ${esc(WERK[q.werkstatt].verfahren)}</span></span>
           <span class="pill ${STAND_KLASSE[z]}">${z}</span></button>`]);
       }));
       hinter = zeilen.sort((p, q) => p[0] - q[0]).map(e => e[1]).join("");
     }
-    const wer = ag ? AUFTRAGGEBER.name : WERK[state.ich].name;
-    const offen = tun.filter(t => t.a).length;
-    return `<div class="head"><div class="kopf-l"><p class="werk">${esc(wer)}</p><h1 class="titel">Aufgaben</h1>
-      <p class="neben">${offen ? `${offen} offen` : "Keine offenen Aufgaben"}</p></div></div>
-      ${tun.length ? fokusHtml(tun[0], true) : ""}
-      ${abschnitt("Weitere Aufgaben", tun.slice(1).map(t => aufgabeZeile(t, true)).concat(ruhe), "weitere")}
+    const mehrere = liste.length > 1;
+    return `<div class="head"><div class="kopf-l"><h1 class="titel">Aufgaben</h1>${tun.length ? "" : '<p class="neben">Keine offenen Aufgaben</p>'}</div></div>
+      ${tun.length ? fokusHtml(tun[0], mehrere) : ""}
+      ${abschnitt("Weitere Aufgaben", tun.slice(1).map(t => aufgabeZeile(t, mehrere)).concat(ruhe), "weitere")}
       ${hinter ? `<section class="karte hintergrund"><h2 class="ktitel">${ag ? "Aufträge" : "Arbeitsschritte"}</h2>${hinter}</section>` : ""}<div class="platz"></div>`;
   }
 
   /* Kopf auf „Träger, jetzt“. Änderung 7: Name der Werkstatt steht oben. */
   function kopfTraeger(a) {
     if (state.ich === "AG") {
-      return `<div class="head"><div class="kopf-l"><p class="werk">${esc(AUFTRAGGEBER.name)}</p>
-        <h1 class="titel">${esc(a.titel)}</h1><p class="neben">${feld("Auftrag", a.id)}</p></div><div class="kopf-r">${pillAuftrag(a)}</div></div>`;
+      return `<div class="head"><div class="kopf-l"><h1 class="titel">${esc(a.titel)}</h1><p class="neben">${feld("Auftrag", a.id)}</p></div><div class="kopf-r">${pillAuftrag(a)}</div></div>`;
     }
     const me = meinNr(a), s = st(a, me), w = WERK[s.werkstatt];
     const z = schrittStand(a, me);
-    return `<div class="head"><div class="kopf-l"><p class="werk">${esc(w.name)}</p>
-      <h1 class="titel">${esc(w.verfahren)}</h1><p class="neben">${feld("Auftrag", a.id)}${feld("Station", `${me} von ${anzahl(a)}`)}</p></div><div class="kopf-r"><span class="pill ${STAND_KLASSE[z]}">${z}</span></div></div>`;
+    return `<div class="head"><div class="kopf-l"><h1 class="titel">${esc(w.verfahren)}</h1><p class="neben">${feld("Auftrag", a.id)}${feld("Station", `${me} von ${anzahl(a)}`)}</p></div><div class="kopf-r"><span class="pill ${STAND_KLASSE[z]}">${z}</span></div></div>`;
   }
 
-  /* Änderung 1 und 2: Abschluss und Lieferung bleiben sichtbar */
-  function statusZeile(a) {
-    const L = a.logistik;
-    if (state.ich === "AG") {
-      if (!L) return "";
-      const zu = ort(a, L.nach);
-      return `<div class="status lieferung"><span class="ico">${ICO.lkw(22)}</span><div><p class="t">Lieferung an ${esc(zu.titel === "Auftraggeber" ? "Sie" : zu.titel)}</p>
-        <p class="u">${esc(logistikStand(L))}${zu.titel === "Auftraggeber" ? "" : ", " + esc(zu.name)}</p></div></div>`;
-    }
-    const me = meinNr(a);
-    if (me == null) return "";
-    const s = st(a, me);
-    if (s.status === "abgeschlossen" && L && L.von === me) {
-      const zu = ort(a, L.nach);
-      return `<div class="status fertig"><span class="ico">${ICO.lkw(22)}</span><div><p class="t">Abgeschlossen, Logistik ist benachrichtigt</p>
-        <p class="u">${esc(logistikStand(L))}, Ziel: ${esc(zu.titel === "Auftraggeber" ? "Auftraggeber" : zu.titel + ", " + zu.name)}</p></div></div>`;
-    }
-    if (s.status === "lieferung") {
-      return `<div class="status lieferung"><span class="ico">${ICO.lkw(22)}</span><div><p class="t">Der Träger ist unterwegs zu Ihnen</p>
-        <p class="u">${L ? esc(logistikStand(L)) : "Noch nicht abgeholt"}</p></div></div>`;
-    }
-    return "";
-  }
   function logistikStand(L) {
     if (L.status === "zugestellt") return `Zugestellt um ${fmtUhr(L.zugestellt)}`;
     if (L.status === "abgeholt") return `Abgeholt um ${fmtUhr(L.abgeholt)}${L.ankunft ? ", " + L.ankunft : ""}`;
@@ -1890,7 +1851,7 @@ body { font-variant-numeric: tabular-nums; }
     } else if (rueck) {
       kopf = `<div class="rueck"><span>Rückblick auf ${esc(langName(a, v))}</span><button type="button" data-act="jetzt" aria-label="Zurück ins Jetzt">×</button></div>`;
     } else {
-      kopf = kopfTraeger(a) + (state.ich === "AG" ? statusZeile(a) : "") + jetztBereich(a);
+      kopf = kopfTraeger(a) + jetztBereich(a);
     }
     const pins = a.anmerkungen.filter(x => (!rueck || x.von <= v) && imZwilling(a, x)).map(x => { const q = pinPos(a, x, v); return q ? pinHtml(a, x, q) : ""; }).join("");
     const traegerSel = ui.kreismenue && !ui.kreismenue.bauteil ? " traeger-sel" : "";
@@ -2009,7 +1970,7 @@ body { font-variant-numeric: tabular-nums; }
   function viewLogistik() {
     const aktiv = state.auftraege.filter(a => a.logistik);
     const a = state.auftraege.find(q => q.id === ui.logAuftrag) || aktiv[0] || cur();
-    if (!a) return `<div class="head"><div class="kopf-l"><p class="werk">${esc(LOGISTIK.name)}</p><h1 class="titel">Abholungen</h1><p class="neben">Keine Abholungen</p></div></div>`;
+    if (!a) return `<div class="head"><div class="kopf-l"><h1 class="titel">Abholungen</h1><p class="neben">Keine Abholungen</p></div></div>`;
     const L = a.logistik;
     let inhalt;
     if (!L) {
@@ -2018,23 +1979,18 @@ body { font-variant-numeric: tabular-nums; }
       inhalt = `<section class="karte"><h2 class="ktitel">Kein Transport offen</h2><p class="neben">Der Träger ist ${esc(wo)}.</p></section>`;
     } else {
       const von = ort(a, L.von), nach = ort(a, L.nach);
-      const stufen = [["Benachrichtigt", L.zeit], ["Abgeholt", L.abgeholt], ["Zugestellt", L.zugestellt]];
-      const idx = { angefragt: 0, abgeholt: 1, zugestellt: 2 }[L.status];
-      const drei = stufen.map(([n, z], i) => `<div class="${i === idx ? "an" : i < idx ? "war" : ""}">${n}<small>${z ? fmtUhr(z) : "offen"}</small></div>`).join("");
       const vonN = L.von === 0 ? "Auftraggeber" : `Station ${L.von}`, nachN = L.nach === ende(a) ? "Auftraggeber" : `Station ${L.nach}`;
       const taste = L.status === "angefragt"
         ? fokusHtml({ von: vonN, an: "Sie", info: L.von === 0 ? "Durchlauf gestartet, Träger abholbereit" : "Schritt fertig, Träger abholbereit", titel: "Abholung bestätigen", kontext: `${von.name}, ${von.adresse}`, knopf: "Abgeholt", act: "log-abholen" })
         : L.status === "abgeholt"
           ? fokusHtml({ von: "Sie", an: nachN, info: "Träger zustellen", titel: "Zustellung bestätigen", kontext: `${nach.name}, ${nach.adresse}`, knopf: "Zugestellt", act: "log-zustellen" })
           : fokusHtml({ zustand: true, titel: "Zugestellt", kontext: `${nach.name}, ${fmtUhr(L.zugestellt)}` });
-      inhalt = taste + `<section class="karte"><p class="beschr">Abholen bei</p><h2 class="ktitel">${esc(von.name)}</h2><p class="neben">${esc(von.titel)}</p><p class="text">${esc(von.adresse)}</p></section>
-        <div class="pfeil" aria-hidden="true">↓</div>
-        <section class="hero"><p class="oben">Liefern an</p><h2 class="btitel">${esc(nach.name)}</h2><p class="neben">${esc(nach.titel)}</p><p class="text">${esc(nach.adresse)}</p></section>
-        <section class="karte"><p class="beschr">Stand</p><div class="drei">${drei}</div></section>`;
+      inhalt = taste + `<section class="karte"><h2 class="ktitel">Abholen bei</h2><p class="text">${esc(von.name)}</p><p class="neben">${esc(von.adresse)}</p></section>
+        <section class="karte ziel-karte"><h2 class="ktitel">Liefern an</h2><p class="text">${esc(nach.name)}</p><p class="neben">${esc(nach.adresse)}</p></section>`;
     }
     const andere = aktiv.filter(q => q !== a).map(q => `<button class="zeile" type="button" data-act="log-waehle" data-id="${q.id}">
         <span class="rest"><span class="ktitel">Träger ${q.traeger}, Auftrag ${q.id}</span><span class="neben">${esc(ort(q, q.logistik.von).name)} → ${esc(ort(q, q.logistik.nach).name)}</span></span>${statusPill("lieferung")}</button>`).join("");
-    return `<div class="head"><div class="kopf-l"><p class="werk">${esc(LOGISTIK.name)}</p><h1 class="titel">Abholungen</h1>
+    return `<div class="head"><div class="kopf-l"><h1 class="titel">Abholungen</h1>
         <p class="neben">${feld("Träger", a.traeger)}${feld("Auftrag", a.id)}</p></div></div>
       ${inhalt}
       ${andere ? `<section class="karte" style="margin-top:12px"><h2 class="ktitel">Weitere Abholungen</h2>${andere}</section>` : ""}<div class="platz"></div>`;
@@ -2044,22 +2000,9 @@ body { font-variant-numeric: tabular-nums; }
      Blätter
      ===================================================================== */
   function peekHtml(a) {
-    const me = meinNr(a);
-    const teile = [];
-    const offen = offeneStopps(a).filter(x => state.ich === "AG" || rolleVon(a, x.von) === state.ich).length;
-    if (offen) teile.push(a.vorbereitung ? `${offen} Rückfrage${offen > 1 ? "n" : ""} offen` : `${offen} Stop${offen > 1 ? "s" : ""} offen`);
-    if (state.ich === "AG") teile.push(a.vorbereitung ? "Vorbereitung" : a.zurueck ? "Träger ist zurück" : `Träger bei ${kurzName(a, jetzt(a))}`);
-    else if (me != null) {
-      const s = st(a, me);
-      if (s.status === "in-arbeit") teile.push(s.empfang ? "Empfang bestätigt" : "In Arbeit");
-      else if (s.status === "lieferung") teile.push("Träger unterwegs zu Ihnen");
-      else if (s.status === "abgeschlossen") teile.push(a.logistik && a.logistik.von === me ? "Logistik benachrichtigt" : "Abgeschlossen");
-      else teile.push(a.vorbereitung ? "Vorbereitung" : "Noch nicht dran");
-    }
     const antw = a.anmerkungen.filter(x => antwortUngelesen(a, x)).length;
-    const rechts = (offen ? chip("stopp", "s") : "") + (antw ? `<span class="antw">${antw} Antwort <i class="dot"></i></span>` : "");
-    return `<div class="grip" data-grip="peek" role="button" tabindex="0" aria-label="Auftrag und Unterlagen öffnen"><i class="griff"></i>
-      <div class="peek-row"><div><p class="ktitel">Auftrag und Unterlagen</p><p class="neben">${teile.join(", ")}</p></div><div class="peek-r">${rechts}</div></div></div>`;
+    return `<div class="grip" data-grip="peek" role="button" tabindex="0" aria-label="Unterlagen öffnen"><i class="griff"></i>
+      <div class="peek-row"><p class="ktitel">Unterlagen</p><div class="peek-r">${antw ? `<span class="antw">${antw} Antwort <i class="dot"></i></span>` : ""}</div></div></div>`;
   }
 
   function blattUnterlagen(a) {
@@ -2067,7 +2010,6 @@ body { font-variant-numeric: tabular-nums; }
     const me = meinNr(a);
     let nr = nurLesen ? ui.unterlagenVon : me;
     if (state.ich === "AG" && !nurLesen) nr = klemme(jetzt(a), 1, anzahl(a));
-    const kopf = `<div class="blatt-kopf"><p class="neben">${feld("Auftrag", a.id)}${esc(a.titel)}${nurLesen ? " (nur lesen)" : ""}</p></div>`;
     if (state.ich === "AG" && a.zurueck && !nurLesen) {
       /* Auswertung: „Für die Serie“ und alle Meldungen nach Schritt; der Auftraggeber ordnet eine Ursache zu und übernimmt */
       const zeile = x => `<button class="zeile" type="button" data-act="pin" data-id="${x.id}">${chip(x.art, "s")}<span class="rest"><span class="text">${esc(meldungInhalt(a, x))}</span>
@@ -2085,60 +2027,32 @@ body { font-variant-numeric: tabular-nums; }
           : `<section class="karte"><h2 class="ktitel">Träger ${a.traeger}</h2><label class="haken-feld"><input type="checkbox" id="leerOk"><span>Alle Bauteile entnommen, Träger leer</span></label></section>
              <div class="fusszeile"><button class="btn pri block" type="button" data-act="freigeben" id="freigebenBtn" disabled>Träger freigeben</button></div>`}` };
     }
-    if (nr === 0 || nr === ende(a)) {
-      return { kopf, body: `<section class="hero"><p class="oben">Auftraggeber</p><h2 class="titel">${esc(AUFTRAGGEBER.name)}</h2><p class="neben">${esc(AUFTRAGGEBER.adresse)}</p></section>` };
-    }
-    const s = st(a, nr), w = WERK[s.werkstatt];
-    const istMeine = istWerk() && nr === me;
-    const hero = `<section class="hero"><p class="oben">Station ${nr} von ${anzahl(a)}</p><h2 class="titel">${esc(w.verfahren)}</h2>
-      <p class="neben">nach DIN 8580, Hauptgruppe ${w.hg}</p><p class="werk">${istMeine ? "Ihre Werkstatt: " : ""}${esc(w.name)}</p></section>`;
-    // Drei Zustände der Station
-    const reihenfolge = ["lieferung", "in-arbeit", "abgeschlossen"];
-    const ix = reihenfolge.indexOf(s.status);
-    const unter = {
-      lieferung: s.status === "lieferung" ? (a.logistik && a.logistik.ankunft ? a.logistik.ankunft : "unterwegs") : (s.empfang ? "angekommen" : ""),
-      "in-arbeit": s.empfang ? `seit ${fmt(s.empfang)}` : "angenommen",
-      abgeschlossen: s.fertig ? `${fmt(s.fertig)}, wartet auf Lieferung` : "wartet auf Lieferung"
-    };
-    const drei = reihenfolge.map((z, i) => `<div class="${i === ix ? "an" : i < ix ? "war" : ""}">${z === "in-arbeit" ? "In Arbeit" : STATUS_NAME[z]}<small>${esc(unter[z])}</small></div>`).join("");
-    const statusKarte = `<section class="karte"><h2 class="ktitel">${istMeine ? "Status Ihrer Station" : "Status der Station"}</h2><div class="drei">${drei}</div>
-      ${s.status === "geplant" ? '<p class="neben">Diese Station ist noch nicht dran.</p>' : ""}</section>`;
+    const w0 = nr >= 1 && nr <= anzahl(a) ? werkVon(a, nr) : null;
+    const kopf = `<div class="blatt-kopf"><p class="neben">${feld("Auftrag", a.id)}${w0 ? feld("Station", `${nr}, ${w0.verfahren}`) : ""}${nurLesen ? "nur lesen" : ""}</p><h2 class="btitel">Unterlagen</h2></div>`;
+    if (!w0) return { kopf, body: `<section class="karte">${dokZeilen(a.unterlagen.filter(u => u.station == null)) || '<p class="leer">Keine Unterlagen</p>'}</section>` };
     // Unterlagen, zuerst der Auftragstext dieser Station. Eine Werkstatt sieht nur ihren eigenen.
     const docs = a.unterlagen.filter(u => u.station == null || u.station === nr);
     const textZeile = state.ich === "AG" || rolleVon(a, nr) === state.ich
       ? `<div class="zeile dokzeile-a"><button class="dok-auf" type="button" data-act="auftragstext" data-nr="${nr}"><span class="dokic d-text">${ICO.dok}</span>
           <span class="rest"><span class="text">Auftragstext</span><span class="neben">Leistung für ${kurzName(a, nr)}</span></span></button></div>` : "";
-    const auftrag = "";
-    const unterlagen = `<section class="karte"><h2 class="ktitel">Unterlagen</h2>${textZeile}${dokZeilen(docs) || (textZeile ? "" : '<p class="leer">Keine Unterlagen für diese Station</p>')}</section>`;
-    // Stopps: Der Auftraggeber sieht alle offenen, eine Werkstatt ihre eigenen
+    const unterlagen = `<section class="karte">${textZeile}${dokZeilen(docs) || (textZeile ? "" : '<p class="leer">Keine Unterlagen</p>')}</section>`;
+    // Stops: Der Auftraggeber sieht alle offenen, eine Werkstatt ihre eigenen
     const stopps = (state.ich === "AG" ? offeneStopps(a) : a.anmerkungen.filter(x => x.art === "stopp" && rolleVon(a, x.von) === state.ich))
       .map(x => (state.ich === "AG" ? meldungZeile(a, x, `${artName(x)}, Station ${x.von}`, meldungInhalt(a, x)) : eigeneZeile(a, x)));
-    const fragenKarte = `<section class="karte"><h2 class="ktitel">${state.ich === "AG" ? "Offene Stops" : "Eigene Stops"}</h2>${stopps.join("") || '<p class="leer">Kein Stop offen</p>'}</section>`;
-    // Nur der Auftraggeber: Hinweise als Zahl je Station, „Für die Serie“ als eigener Bereich
+    const stoppKarte = abschnitt(state.ich === "AG" ? "Offene Stops" : "Eigene Stops", stopps, "stops-" + a.id);
+    // Nur der Auftraggeber: Hinweise als Zahl je Station, Serie als eigener Bereich
     let agTeil = "";
     if (state.ich === "AG") {
-      const zahlen = a.stationen.map(q => { const n = a.anmerkungen.filter(x => x.art === "hinweis" && x.bezug === q.nr).length;
-        return `<div class="zeile"><span class="knoten-klein">${q.nr}</span><span class="rest text">${esc(WERK[q.werkstatt].verfahren)}</span><span class="neben">${n} Hinweis${n === 1 ? "" : "e"}</span></div>`; }).join("");
-      const serie = a.anmerkungen.filter(x => x.art === "serie").map(x => meldungZeile(a, x, meldungInhalt(a, x), `von Station ${x.von}, betrifft Station ${x.bezug}`));
-      agTeil = `<section class="karte"><h2 class="ktitel">Hinweise je Station</h2>${zahlen}</section>
-        <section class="karte"><h2 class="ktitel">Serie</h2>${serie.join("") || '<p class="leer">Noch nichts gesammelt</p>'}</section>`;
+      const zahlen = a.stationen.map(q => [q, a.anmerkungen.filter(x => x.art === "hinweis" && x.bezug === q.nr).length]).filter(e => e[1])
+        .map(([q, n]) => `<div class="zeile"><span class="knoten-klein">${q.nr}</span><span class="rest text">${esc(WERK[q.werkstatt].verfahren)}</span><span class="neben">${n} Hinweis${n === 1 ? "" : "e"}</span></div>`);
+      const serie = a.anmerkungen.filter(x => x.art === "serie").map(x => meldungZeile(a, x, meldungInhalt(a, x), `von Station ${x.von}`));
+      agTeil = abschnitt("Hinweise", zahlen, "hinweise-" + a.id) + abschnitt("Serie", serie, "serie-" + a.id);
     }
-    // Abholung und Code: Änderung 1 und 2
-    let abholung;
     const L = a.logistik;
-    if (L && L.von === nr) {
-      const zu = ort(a, L.nach);
-      const reihe = [["Logistik benachrichtigt", L.zeit], ["Abgeholt", L.abgeholt], ["Zugestellt", L.zugestellt]]
-        .map(([n, z]) => `<div class="zeile">${z ? `<span style="color:var(--ink)">${ICO.haken}</span>` : '<span style="width:18px"></span>'}<span class="rest text">${n}</span><span class="neben">${z ? fmt(z) : "offen"}</span></div>`).join("");
-      abholung = `<section class="karte"><h2 class="ktitel">Abholung</h2>${reihe}
-        <p class="hinweiszeile" style="margin:4px 0 0">Ziel laut Code am Träger: ${esc(zu.titel === "Auftraggeber" ? "Auftraggeber" : zu.titel)}, ${esc(zu.name)}, ${esc(zu.adresse)}</p></section>`;
-    } else if (s.status === "lieferung") {
-      abholung = `<section class="karte"><h2 class="ktitel">Lieferung</h2><p class="neben">${L ? esc(logistikStand(L)) : "Noch nicht abgeholt"}</p></section>`;
-    } else abholung = "";
-    const empfang = s.empfang ? `<p class="neben" style="margin:0 0 12px">✓ Empfang beim Scan bestätigt, ${fmt(s.empfang)}</p>` : "";
+    const abholung = L && L.von === nr ? `<section class="karte"><h2 class="ktitel">Abholung</h2><p class="text">${esc(logistikStand(L))}</p><p class="neben">Ziel: ${esc(ort(a, L.nach).name)}</p></section>` : "";
     const uebernehmen = state.ich === "AG" && a.zurueck && !a.abgeschlossen
       ? `<div class="fusszeile"><button class="btn pri block" type="button" data-act="uebernehmen">In Unterlagen übernehmen</button></div>` : "";
-    return { kopf, body: hero + statusKarte + abholung + auftrag + unterlagen + fragenKarte + agTeil + empfang + uebernehmen };
+    return { kopf, body: unterlagen + stoppKarte + agTeil + abholung + uebernehmen };
   }
 
   /* Stufe wählen: die vier Prüffragen von oben nach unten */
@@ -2182,7 +2096,7 @@ body { font-variant-numeric: tabular-nums; }
     else if (d.art === "hinweis" && gewaehlt) wer = `Zustellung an Station ${d.bezug} beim Annehmen des Trägers`;
     else if (d.art === "serie") wer = "Gesammelt beim Auftraggeber für Folgeaufträge";
     const body = kacheln + foto + memo + abschrift + bezug
-      + (wer ? `<p class="hinweiszeile">${wer}</p>` : "")
+      + (wer ? `<p class="neben" style="margin:0 0 12px">${wer}</p>` : "")
       + `<div class="fusszeile"><button class="btn pri block" type="button" data-act="senden" ${(d.foto || d.memo) && gewaehlt ? "" : "disabled"}>Senden</button></div>`;
     return { kopf, body };
   }
@@ -2306,14 +2220,12 @@ body { font-variant-numeric: tabular-nums; }
     const x = findAnm(a, ui.offeneAnmerkung);
     if (!x) return { kopf: "", body: "" };
     const ok = darfSehen(a, x), ag = state.ich === "AG";
-    const autor = x.von === 0 ? AUFTRAGGEBER.name : werkVon(a, x.von).name;
     const wohin = x.art === "stopp" ? "an Auftraggeber" : x.art === "entscheidung" ? `betrifft Station ${x.bezug}` : x.art === "hinweis" ? `an Station ${x.bezug}` : "Serie";
     const stufe = ag && !x.rueckfrage
       ? `<button class="artpill gross a-${x.art}" type="button" data-act="stufe-aendern" aria-expanded="${!!ui.stufeAendern}" aria-label="Stufe ändern, jetzt ${artName(x)}">${chip(x.art, "s")}${artName(x)}</button>`
       : `<span class="artpill gross a-${x.art}">${chip(x.art, "s")}${artName(x)}</span>`;
     const kopf = `<div class="blatt-kopf"><div class="kopfzeile"><button class="rundknopf" type="button" data-act="blatt-zu" aria-label="Zurück zur Fläche">${ICO.zurueck}</button>${stufe}</div>
-      <p class="neben">Station ${x.von}, ${esc(autor)}, ${wohin}${x.bauteil ? `, ${esc(bauteilName(a, x.bauteil))}` : ""}</p>
-      <p class="neben">${fmt(x.zeit)}</p></div>`;
+      <p class="neben">${[`Station ${x.von}`, x.art === "serie" ? "" : wohin, x.bauteil ? esc(bauteilName(a, x.bauteil)) : "", fmt(x.zeit)].filter(Boolean).join(", ")}</p></div>`;
     if (!ok) {
       return { kopf, body: `<p class="hinweiszeile">Nur für die Beteiligten sichtbar.</p><div class="fusszeile"><button class="btn umriss block" type="button" data-act="blatt-zu">Schließen</button></div>` };
     }
@@ -2356,10 +2268,7 @@ body { font-variant-numeric: tabular-nums; }
   function blattAnnehmen(a) {
     const me = meinNr(a);
     const hinweise = a.anmerkungen.filter(x => x.art === "hinweis" && x.bezug === me).map(x => eigeneZeile(a, x));
-    const teile = zwillingTeile(a, me).filter(b => vorhanden(a, b, me)).map(b => {
-      const q = b.entsteht && b.entsteht !== "AG" ? stUid(a, b.entsteht) : null;
-      return `<div class="zeile"><span class="rest"><span class="text">${esc(b.name)}</span><span class="neben">${q ? `von ${kurzName(a, q.nr)}, ${esc(WERK[q.werkstatt].name)}` : "vom Auftraggeber"}</span></span></div>`;
-    }).join("");
+    const teile = zwillingTeile(a, me).filter(b => vorhanden(a, b, me)).map(b => `<div class="zeile"><span class="rest text">${esc(b.name)}</span></div>`).join("");
     const kopf = `<div class="blatt-kopf"><p class="neben">${feld("Auftrag", a.id)}${feld("Station", me)}</p><h2 class="btitel">Träger annehmen</h2></div>`;
     const body = (hinweise.length ? `<section class="karte"><h2 class="ktitel">Eingehende Hinweise</h2>${hinweise.join("")}</section>` : "")
       + `<section class="karte"><h2 class="ktitel">Inhalt prüfen</h2>${teile || '<p class="leer">Noch keine Bauteile</p>'}</section>`
@@ -2368,25 +2277,13 @@ body { font-variant-numeric: tabular-nums; }
   }
 
   function blattUebergabe(a) {
-    const me = meinNr(a), w = werkVon(a, me), nach = me + 1, E = ende(a);
+    const me = meinNr(a), nach = me + 1;
     const kopf = `<div class="blatt-kopf"><p class="neben">${feld("Auftrag", a.id)}${feld("Station", me)}</p><h2 class="btitel">Schritt abschließen</h2></div>`;
-    const eigeneOffen = wartet(a, me);
     const hinweise = a.anmerkungen.filter(x => x.von === me && x.art === "hinweis").map(x => meldungZeile(a, x, `Hinweis für Station ${x.bezug}`, meldungInhalt(a, x))).join("");
-    const ziel = ort(a, nach);
-    const uid = st(a, me).uid;
-    const hier = a.bauteile.filter(b => b.entsteht === uid || (b.stufen || []).some(x => x.bei === uid));
-    const wie = b => {
-      if (b.art === "baugruppe" && b.entsteht === uid) return "gefügt aus " + b.teile.map(id => esc(bauteilName(a, id))).join(", ");
-      if (b.entsteht === uid) return "gefertigt";
-      return "bearbeitet";
-    };
-    const entsteht = hier.length ? `<section class="karte"><h2 class="ktitel">Gefertigt</h2>${hier.map(b => `<div class="zeile"><span style="color:var(--ink)">${ICO.haken}</span><span class="rest"><span class="text">${esc(b.name)}</span><span class="neben">${wie(b)}</span></span></div>`).join("")}</section>` : "";
-    const naechste = `<section class="karte"><h2 class="ktitel">${nach === E ? "Rückkehr" : "Nächste Station"}</h2><div class="naechste"><span class="rund">${knotenText(a, nach)}</span>
-      <div><p class="ktitel" style="font-weight:600">${esc(ziel.titel)}</p><p class="werk" style="font-size:14px">${esc(ziel.name)}</p><p class="neben">${esc(ziel.adresse)}</p></div></div></section>`;
-    const body = (eigeneOffen ? `<p class="hinweiszeile frage">Stop offen</p>` : "")
-      + `<section class="karte"><h2 class="ktitel">Hinweise an Folgestationen</h2>${hinweise || '<p class="leer">Keine</p>'}</section>`
-      + entsteht + naechste
-      + `<div class="fusszeile"><button class="btn pri block" type="button" data-act="uebergeben">Schritt abschließen</button></div>`;
+    const body = (wartet(a, me) ? `<p class="hinweiszeile frage">Stop offen</p>` : "")
+      + (hinweise ? `<section class="karte"><h2 class="ktitel">Hinweise an Folgestationen</h2>${hinweise}</section>` : "")
+      + `<div class="fusszeile"><p class="neben" style="margin:0 0 8px">An Logistik, ${nach === ende(a) ? "Auftraggeber" : `Station ${nach}, ${esc(werkVon(a, nach).name)}`}</p>
+        <button class="btn pri block" type="button" data-act="uebergeben">Schritt abschließen</button></div>`;
     return { kopf, body };
   }
 
@@ -3607,7 +3504,7 @@ body { font-variant-numeric: tabular-nums; }
     post("AG", a, { titel: `Status: angenommen bei Station ${me}`, text: `Auftrag ${a.id}, ${werkVon(a, me).name}` }, false);
     schliesseAlles();
     render();
-    toast("Angenommen, Status an Auftraggeber");
+    toast("Angenommen");
   }
 
   /* Übergeben: Änderung 1 (große Meldung) und 2 (Code zeigt das neue Ziel) */
@@ -4665,7 +4562,7 @@ body { font-variant-numeric: tabular-nums; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261127143823";
+  const BUILD = "20261127151126";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
