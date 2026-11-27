@@ -774,6 +774,13 @@ body { font-variant-numeric: tabular-nums; }
 .twin g.mein .part { stroke: var(--ink); stroke-width: 2px; }
 /* Arbeitsgang: eigene Notizen */
 .zeile.notiz .text { white-space: pre-wrap; }
+/* Zustand mit Stand je Station: was bestätigt ist, was aussteht */
+.zustand .z-rest { flex: 1; }
+.z-zeilen { display: grid; gap: 4px; margin-top: 8px; }
+.z-zeile { display: flex; justify-content: space-between; gap: 12px; font: 400 14px/1.35 var(--font); color: var(--ink); }
+.z-zeile .z-ok { color: var(--grey); }
+.z-zeile .z-offen { font-weight: 600; }
+.z-zeile .z-frage { font-weight: 600; color: var(--frage); }
 </style>
 </head>
 <body>
@@ -1612,7 +1619,11 @@ body { font-variant-numeric: tabular-nums; }
   const memoZeile = (sek, quelle) => `<div class="memozeile"><button class="play" type="button" data-act="abspielen" data-q="${quelle}" aria-label="Memo abspielen, ${dauer(sek)}">${ICO.abspielen}</button><span class="welle" aria-hidden="true">${welle(26, sek)}</span><span class="dauer">${dauer(sek)}</span></div>`;
 
   function pillAuftrag(a) {
-    if (a.vorbereitung) return offeneStopps(a).length ? `<span class="pill st-wartet">Rückfragen offen</span>` : `<span class="pill st-geplant">Vorbereitung</span>`;
+    if (a.vorbereitung) {
+      if (offeneStopps(a).length) return `<span class="pill st-wartet">Rückfrage offen</span>`;
+      const n = a.stationen.filter(q => q.bestaetigt).length;
+      return n < anzahl(a) ? `<span class="pill st-geplant">${n} von ${anzahl(a)} bestätigt</span>` : `<span class="pill st-fertig">Startbereit</span>`;
+    }
     if (a.abgeschlossen) return `<span class="pill st-ende">Abgeschlossen</span>`;
     if (a.logistik) return `<span class="pill st-lieferung">Lieferung</span>`;
     if (a.zurueck) return `<span class="pill st-fertig">Zurück</span>`;
@@ -1633,6 +1644,12 @@ body { font-variant-numeric: tabular-nums; }
     else if (wartet(a, jetzt(a))) cls = "f-wartet";
     else if (a.zurueck) cls = "f-fertig";
     return { p: a.abgeschlossen ? 100 : Math.round(((fertig + halb) / n) * 100), cls };
+  }
+  function traegerOrt(a) {
+    if (a.zurueck || a.vorbereitung) return "beim Auftraggeber";
+    if (a.logistik) return `unterwegs zu ${a.logistik.nach === ende(a) ? "Auftraggeber" : `Station ${a.logistik.nach}`}`;
+    const j = jetzt(a);
+    return j >= 1 && j <= anzahl(a) ? `bei Station ${j}, ${werkVon(a, j).name}` : "beim Auftraggeber";
   }
   function positionText(a) {
     if (a.vorbereitung) return "Vorbereitung, Träger beim Auftraggeber";
@@ -1730,10 +1747,10 @@ body { font-variant-numeric: tabular-nums; }
     return meldungZeile(a, x, text, meldungInhalt(a, x));
   }
   /* Status eines Arbeitsschritts, technisch benannt */
-  const STAND_KLASSE = { Geplant: "st-geplant", Vorbereitung: "st-geplant", "In Zustellung": "st-lieferung", Zugestellt: "st-lieferung", "In Arbeit": "st-arbeit", Gestoppt: "st-wartet", "Rückfrage offen": "st-wartet", Abgeschlossen: "st-fertig" };
+  const STAND_KLASSE = { Geplant: "st-geplant", Vorbereitung: "st-geplant", "In Zustellung": "st-lieferung", Zugestellt: "st-lieferung", "In Arbeit": "st-arbeit", Gestoppt: "st-wartet", "Rückfrage offen": "st-wartet", Abgeschlossen: "st-fertig", Bestätigt: "st-fertig", "Zu prüfen": "st-geplant" };
   function schrittStand(a, nr) {
     const s = st(a, nr);
-    if (a.vorbereitung) return wartet(a, nr) ? "Rückfrage offen" : "Vorbereitung";
+    if (a.vorbereitung) return wartet(a, nr) ? "Rückfrage offen" : s.bestaetigt ? "Bestätigt" : "Zu prüfen";
     if (s.status === "lieferung") return a.logistik && a.logistik.nach === nr && a.logistik.status === "zugestellt" ? "Zugestellt" : "In Zustellung";
     if (s.status === "in-arbeit") return wartet(a, nr) ? "Gestoppt" : "In Arbeit";
     if (s.status === "abgeschlossen") return "Abgeschlossen";
@@ -1759,7 +1776,8 @@ body { font-variant-numeric: tabular-nums; }
       if (a.vorbereitung) {
         const fehlen = a.stationen.filter(q => !q.bestaetigt);
         if (!fehlen.length && !offeneStopps(a).length) t(3, { von: "Sie", an: "Logistik, Station 1", titel: "Durchlauf starten", act: "durchlauf-starten" });
-        else if (fehlen.length) t(6, { zustand: true, titel: `Bestätigt: ${anzahl(a) - fehlen.length} von ${anzahl(a)}`, kontext: `Offen: ${fehlen.map(q => "Station " + q.nr).join(", ")}` });
+        else if (fehlen.length) t(6, { zustand: true, titel: "Start wartet auf Bestätigung der Unterlagen", kontext: "",
+          zeilen: a.stationen.map(q => [`Station ${q.nr}, ${WERK[q.werkstatt].name}`, wartet(a, q.nr) ? "Rückfrage offen" : q.bestaetigt ? "bestätigt" : "ausstehend"]) });
       }
       if (a.zurueck && !a.abgeschlossen) t(4, { von: "Alle Stationen", an: "Sie", info: "Gesammelte Meldungen und Serie",
         titel: "Auswerten", kontext: `${a.anmerkungen.length} Meldungen, davon ${a.anmerkungen.filter(x => x.art === "serie").length} Serie`, knopf: "Auswerten", act: "unterlagen-auf" });
@@ -1772,12 +1790,12 @@ body { font-variant-numeric: tabular-nums; }
     const s = st(a, me), w = werkVon(a, me), Lg = a.logistik;
     a.anmerkungen.forEach(x => {
       if (x.art === "stopp" && rolleVon(a, x.von) === ich) {
-        if (x.offen) t(2, { zustand: true, art: "stopp", titel: "Wartet auf Antwort", kontext: "", act: "pin", id: x.id });
+        if (x.offen) t(2, { zustand: true, art: "stopp", titel: `${artName(x)} gesendet`, kontext: "Antwort des Auftraggebers ausstehend", act: "pin", id: x.id });
         else if (antwortUngelesen(a, x)) t(1, { art: "stopp", von: "Auftraggeber", an: "Sie", info: `Antwort zu ${artName(x)}`, titel: "Antwort lesen", kontext: meldungInhalt(a, x),
           inhalt: (x.antworten[x.antworten.length - 1] || {}).abschrift || "", knopf: "Öffnen", act: "pin", id: x.id });
       }
       if (x.art === "entscheidung" && beteiligt(a, x, ich)) {
-        if (x.offen) t(4, { zustand: true, art: "entscheidung", titel: "Entscheidung ausstehend", kontext: "", act: "pin", id: x.id });
+        if (x.offen) t(4, { zustand: true, art: "entscheidung", titel: "Entscheidung ausstehend", kontext: `Anpassung an Station ${x.bezug}, Auftraggeber entscheidet`, act: "pin", id: x.id });
         else if (anmUngelesen(a, x) || antwortUngelesen(a, x)) t(1, { art: "entscheidung", von: "Auftraggeber", an: "Sie", info: "Entscheidung", titel: "Entscheidung lesen", kontext: entscheidungText(x), knopf: "Öffnen", act: "pin", id: x.id });
       }
     });
@@ -1786,14 +1804,14 @@ body { font-variant-numeric: tabular-nums; }
       kontext: `Von Station ${hinweise[0].von}, ${werkVon(a, hinweise[0].von).name}`, inhalt: meldungInhalt(a, hinweise[0]), knopf: "Öffnen", act: "pin", id: hinweise[0].id });
     if (a.vorbereitung) {
       if (!meineStationen(a).every(q => q.bestaetigt)) { if (!wartet(a, me)) t(5, { von: "Auftraggeber", an: "Sie", titel: "Unterlagen prüfen", act: "unterlagen-auf" }); }
-      else t(7, { zustand: true, titel: "Bestätigt", kontext: "Wartet auf Start" });
+      else t(7, { zustand: true, titel: "Unterlagen bestätigt", kontext: "Start des Durchlaufs durch den Auftraggeber ausstehend" });
     }
     else if (s.status === "lieferung") {
       if (Lg && Lg.nach === me && Lg.status === "zugestellt") t(0, { von: "Sie", an: "Auftraggeber", info: "Status: angenommen", titel: "Träger annehmen", kontext: `Zugestellt um ${fmtUhr(Lg.zugestellt)}`, knopf: "Annehmen", act: "annehmen-auf" });
-      else t(6, { zustand: true, titel: "In Zustellung", kontext: Lg && Lg.nach === me ? logistikStand(Lg) : "Abholung ausstehend" });
+      else t(6, { zustand: true, titel: "Träger unterwegs zu Ihnen", kontext: Lg && Lg.nach === me ? logistikStand(Lg) : "Abholung durch die Logistik ausstehend" });
     } else if (s.status === "in-arbeit") t(6, { von: "Sie", an: me + 1 <= anzahl(a) ? `Logistik, Station ${me + 1}` : "Logistik, Auftraggeber", info: "Schritt fertig, Träger abholbereit", titel: "Schritt abschließen", kontext: `${w.verfahren}, Station ${me} von ${anzahl(a)}`, knopf: "Abschließen", act: "fertigstellen" });
-    else if (s.status === "geplant") t(7, { zustand: true, titel: "Geplant", kontext: `Aktuell: ${positionText(a)}` });
-    else t(8, { zustand: true, titel: "Abgeschlossen", kontext: Lg && Lg.von === me ? logistikStand(Lg) : "" });
+    else if (s.status === "geplant") t(7, { zustand: true, titel: "Arbeitsschritt geplant", kontext: `Träger zurzeit ${traegerOrt(a)}` });
+    else t(8, { zustand: true, titel: "Arbeitsschritt abgeschlossen", kontext: Lg && Lg.von === me ? `${logistikStand(Lg)}, Ziel: ${ort(a, Lg.nach).name}` : "" });
     return L.sort((p, q) => p.rang - q.rang);
   }
   const datenVon = t => (t.act ? `data-act="${t.act}"${t.id ? ` data-id="${t.id}"` : ""}${t.a ? ` data-auftrag="${t.a.id}"` : ""}` : "");
@@ -1801,7 +1819,8 @@ body { font-variant-numeric: tabular-nums; }
   /* Fokus: die eine Übergabe, die jetzt ansteht. Eine Zeile, wer beteiligt ist, darunter die Handlung als Hauptknopf. */
   function fokusHtml(t, mitAuftrag) {
     if (t.zustand) {
-      const innen = `${t.art ? chip(t.art, "s") : ""}<span class="z-rest"><span class="z-titel">${esc(t.titel)}</span>${t.kontext ? `<span class="z-text">${esc(t.kontext)}</span>` : ""}</span>`;
+      const zeilen = t.zeilen ? `<span class="z-zeilen">${t.zeilen.map(([n, w]) => `<span class="z-zeile"><span>${esc(n)}</span><span class="${w === "bestätigt" ? "z-ok" : w === "ausstehend" ? "z-offen" : "z-frage"}">${w}</span></span>`).join("")}</span>` : "";
+      const innen = `${t.art ? chip(t.art, "s") : ""}<span class="z-rest"><span class="z-titel">${esc(t.titel)}</span>${t.kontext ? `<span class="z-text">${esc(t.kontext)}</span>` : ""}${zeilen}</span>`;
       return t.act ? `<button class="zustand" type="button" ${datenVon(t)}>${innen}</button>` : `<div class="zustand">${innen}</div>`;
     }
     const zeile = [mitAuftrag && t.a ? t.a.id : "", richtung(t)].filter(Boolean).join(", ");
@@ -1827,10 +1846,10 @@ body { font-variant-numeric: tabular-nums; }
     let hinter;
     if (ag) {
       hinter = liste.map(a => { const j = jetzt(a); return `<button class="zeile" type="button" data-act="oeffne-traeger" data-id="${a.id}"><span class="rest"><span class="text">${esc(a.titel)}</span>
-          <span class="neben">${a.id}${!a.zurueck && j >= 1 && j <= anzahl(a) ? `, Station ${j} von ${anzahl(a)}` : ""}</span></span>${pillAuftrag(a)}</button>`; }).join("")
+          <span class="neben">${a.id}, Träger ${traegerOrt(a)}</span></span>${pillAuftrag(a)}</button>`; }).join("")
         + (liste.length ? `<button class="btn umriss block" type="button" data-act="projekt-neu" style="margin-top:10px">Neuer Auftrag</button>` : "");
     } else {
-      const rang = { Zugestellt: 0, "In Arbeit": 1, Gestoppt: 1, "Rückfrage offen": 2, Vorbereitung: 2, "In Zustellung": 3, Geplant: 4, Abgeschlossen: 5 };
+      const rang = { Zugestellt: 0, "In Arbeit": 1, Gestoppt: 1, "Rückfrage offen": 2, "Zu prüfen": 2, Bestätigt: 3, "In Zustellung": 3, Geplant: 4, Abgeschlossen: 5 };
       const zeilen = [];
       liste.forEach(a => a.stationen.filter(q => q.werkstatt === state.ich).forEach(q => {
         const z = schrittStand(a, q.nr);
@@ -2042,7 +2061,7 @@ body { font-variant-numeric: tabular-nums; }
         const l = a.anmerkungen.filter(x => x.art !== "serie" && x.bezug === s.nr);
         return l.length ? `<section class="karte"><h2 class="ktitel">${esc(langName(a, s.nr))}</h2>${l.map(zeile).join("")}</section>` : "";
       }).join("");
-      const kopfZ = `<div class="blatt-kopf"><p class="neben">${feld("Auftrag", a.id)}${a.abgeschlossen ? "" : `${fertig} von ${alle} bearbeitet`}</p><h2 class="btitel">${a.abgeschlossen ? "Unterlagen übergeben" : "Auswertung"}</h2></div>`;
+      const kopfZ = `<div class="blatt-kopf"><p class="neben">${feld("Auftrag", a.id)}${a.abgeschlossen ? "" : `${fertig} von ${alle} Meldungen bearbeitet`}</p><h2 class="btitel">${a.abgeschlossen ? "Unterlagen übergeben" : "Auswertung"}</h2></div>`;
       return { kopf: kopfZ, body: `<section class="karte"><h2 class="ktitel">Serie</h2>${serie.map(zeile).join("") || '<p class="leer">Nichts gesammelt</p>'}</section>
         ${jeSchritt || '<section class="karte"><p class="leer">Keine weiteren Meldungen</p></section>'}
         ${!a.abgeschlossen ? `<div class="fusszeile"><button class="btn pri block" type="button" data-act="uebernehmen" ${fertig < alle ? "disabled" : ""}>Unterlagen an Betriebe geben</button></div>`
@@ -4669,7 +4688,7 @@ body { font-variant-numeric: tabular-nums; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261127160832";
+  const BUILD = "20261127162904";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
