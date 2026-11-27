@@ -1669,7 +1669,7 @@ body { font-variant-numeric: tabular-nums; }
   }
   function traegerOrt(a) {
     if (a.zurueck || a.vorbereitung) return "beim Auftraggeber";
-    if (a.logistik) return `unterwegs zu ${a.logistik.nach === ende(a) ? "Auftraggeber" : `Station ${a.logistik.nach}`}`;
+    if (a.logistik) return `unterwegs ${a.logistik.nach === ende(a) ? "zum Auftraggeber" : `zu Station ${a.logistik.nach}`}`;
     const j = jetzt(a);
     return j >= 1 && j <= anzahl(a) ? `bei Station ${j}, ${werkVon(a, j).name}` : "beim Auftraggeber";
   }
@@ -1938,27 +1938,36 @@ body { font-variant-numeric: tabular-nums; }
     /* Zustände zu Meldungen (Stop offen, Entscheidung ausstehend) stehen ruhig unter den Aufgaben */
     const ruhe = alle.filter(t => t.zustand && t.act).map(t => aufgabeZeile(t, liste.length > 1));
     if (ag && !liste.length) tun.push({ rang: 9, titel: "Auftrag anlegen", kontext: "Träger koppeln, Stationen und Bauteile festlegen", knopf: "Anlegen", act: "projekt-neu" });
-    let hinter;
+    /* Aufträge in zwei Gruppen: Erstdurchlauf, bis der Auftraggeber die Unterlagen nach der Auswertung an die Betriebe gegeben hat; danach Serie */
+    const erst = liste.filter(a => !a.abgeschlossen), serie = liste.filter(a => a.abgeschlossen);
+    let zeilenErst, zeilenSerie;
     if (ag) {
-      hinter = liste.map(a => { const j = jetzt(a); return `<button class="zeile" type="button" data-act="oeffne-traeger" data-id="${a.id}"><span class="rest"><span class="text">${esc(a.titel)}</span>
-          <span class="neben">${a.id}, Träger ${traegerOrt(a)}</span></span>${pillAuftrag(a)}</button>`; }).join("")
-        + (liste.length ? `<button class="btn umriss block" type="button" data-act="projekt-neu" style="margin-top:10px">Neuer Auftrag</button>` : "");
+      const zeile = (a, pill, neben) => `<button class="zeile" type="button" data-act="oeffne-traeger" data-id="${a.id}"><span class="rest"><span class="text">${esc(a.titel)}</span>
+          <span class="neben">${a.id}, ${neben}</span></span>${pill}</button>`;
+      zeilenErst = erst.map(a => zeile(a, pillAuftrag(a), `Träger ${traegerOrt(a)}`)).join("");
+      zeilenSerie = serie.map(a => zeile(a, "", a.freigegeben ? "Träger freigegeben" : "Träger beim Auftraggeber")).join("");
     } else {
       const rang = { Zugestellt: 0, "In Arbeit": 1, Gestoppt: 1, "Rückfrage offen": 2, "Zu prüfen": 2, Bestätigt: 3, "In Zustellung": 3, Geplant: 4, Abgeschlossen: 5 };
-      const zeilen = [];
-      liste.forEach(a => a.stationen.filter(q => q.werkstatt === state.ich).forEach(q => {
-        const z = schrittStand(a, q.nr);
-        zeilen.push([rang[z], `<button class="zeile" type="button" data-act="oeffne-traeger" data-id="${a.id}"><span class="knoten-klein">${q.nr}</span>
-          <span class="rest"><span class="text">${esc(a.titel)}</span><span class="neben">${a.id}, ${esc(WERK[q.werkstatt].verfahren)}</span></span>
-          <span class="pill ${STAND_KLASSE[z]}">${z}</span></button>`]);
-      }));
-      hinter = zeilen.sort((p, q) => p[0] - q[0]).map(e => e[1]).join("");
+      const schritte = (L, serieJa) => {
+        const zeilen = [];
+        L.forEach(a => a.stationen.filter(q => q.werkstatt === state.ich).forEach(q => {
+          const z = schrittStand(a, q.nr);
+          zeilen.push([serieJa ? 0 : rang[z], `<button class="zeile" type="button" data-act="oeffne-traeger" data-id="${a.id}"><span class="knoten-klein">${q.nr}</span>
+            <span class="rest"><span class="text">${esc(a.titel)}</span><span class="neben">${a.id}, ${esc(WERK[q.werkstatt].verfahren)}</span></span>
+            ${serieJa ? `<span class="pill st-geplant">Index ${q.index || "A"}</span>` : `<span class="pill ${STAND_KLASSE[z]}">${z}</span>`}</button>`]);
+        }));
+        return zeilen.sort((p, q) => p[0] - q[0]).map(e => e[1]).join("");
+      };
+      zeilenErst = schritte(erst, false); zeilenSerie = schritte(serie, true);
     }
+    const neu = ag && liste.length ? `<button class="btn umriss block" type="button" data-act="projekt-neu" style="margin-top:10px">Neuer Auftrag</button>` : "";
+    const hinter = (zeilenErst || neu ? `<section class="karte hintergrund" data-gruppe="erst"><h2 class="ktitel">Erstdurchlauf</h2>${zeilenErst}${neu}</section>` : "")
+      + (zeilenSerie ? `<section class="karte hintergrund" data-gruppe="serie"><h2 class="ktitel">Serie</h2>${zeilenSerie}</section>` : "");
     const mehrere = liste.length > 1;
     return `<div class="head"><div class="kopf-l"><h1 class="titel">Aufgaben</h1>${tun.length ? "" : '<p class="neben">Keine offenen Aufgaben</p>'}</div></div>
       ${tun.length ? fokusHtml(tun[0], mehrere) : ""}
       ${abschnitt("Weitere Aufgaben", tun.slice(1).map(t => aufgabeZeile(t, mehrere)).concat(ruhe), "weitere")}
-      ${hinter ? `<section class="karte hintergrund"><h2 class="ktitel">${ag ? "Aufträge" : "Arbeitsschritte"}</h2>${hinter}</section>` : ""}<div class="platz"></div>`;
+      ${hinter}<div class="platz"></div>`;
   }
 
   /* Kopf auf „Träger, jetzt“. Änderung 7: Name der Werkstatt steht oben. */
@@ -4865,7 +4874,7 @@ body { font-variant-numeric: tabular-nums; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261127190302";
+  const BUILD = "20261127191226";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
