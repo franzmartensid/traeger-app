@@ -765,13 +765,20 @@ body { font-variant-numeric: tabular-nums; }
 .stufe-knopf .rest { display: grid; gap: 2px; }
 .stufe-knopf .ktitel { font: 700 17px/1.2 var(--font); }
 .stufe-knopf .neben { font-size: 14px; }
-/* Zwilling für eine Werkstatt: eigene Bauteile kräftig mit Rand, alles andere im Träger tritt zurück */
-.twin g.fremd { opacity: .32; }
-.twin g.fremd image { filter: grayscale(1); }
-.twin g.fremd.geplant { opacity: .6; }
-.mein-rahmen { fill: none; stroke: var(--ink); stroke-width: 1.8px; vector-effect: non-scaling-stroke; }
-.soll-platz.mein { stroke: var(--ink); stroke-width: 1.4px; }
-.twin g.mein .part { stroke: var(--ink); stroke-width: 2px; }
+/* Zwilling für eine Werkstatt: drei Zustände, auf einen Blick unterscheidbar.
+   Liegt im Träger: normal. Noch nicht gefertigt: nur ein blasser, gestrichelter Umriss.
+   Ihr Bauteil: durchgehender Rahmen und Schild mit der Tätigkeit; orange, wenn die Station dran ist. */
+.twin g.fremd.geplant image { opacity: .14; }
+.twin g.mein.geplant image { opacity: .55; }
+.mein-flaeche { fill: var(--surface); stroke: none; }
+.twin g.mein.aktiv .mein-flaeche { fill: var(--accent-soft); }
+.mein-rahmen { fill: none; stroke: var(--ink); stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.twin g.mein.aktiv .mein-rahmen { stroke: var(--accent); stroke-width: 2.4px; }
+.twin g.mein .part { stroke: var(--ink); stroke-width: 2px; stroke-dasharray: none; }
+.twin g.mein.aktiv .part { stroke: var(--accent); fill: var(--accent-soft); }
+.teil-marke { position: absolute; z-index: 1; transform: translate(-2px, -60%); pointer-events: none; white-space: nowrap;
+  padding: 2px 7px; border-radius: 4px; background: var(--ink); color: var(--surface); font: 600 12px/16px var(--font); }
+.teil-marke.aktiv { background: var(--accent); color: var(--ink); }
 /* Arbeitsgang: eigene Notizen */
 .zeile.notiz .text { white-space: pre-wrap; }
 /* Zustand mit Stand je Station: was bestätigt ist, was aussteht */
@@ -1668,21 +1675,27 @@ body { font-variant-numeric: tabular-nums; }
      Noch nicht gefertigte Teile erscheinen blass an ihrem Platz, gefertigte kräftig. */
   function zwillingSvg(a, sel, v = jetzt(a), mitZiel = false) {
     const lage = lageVon(a, v), liste = zwillingTeile(a, v), j = jetzt(a), jq = st(a, j);
-    const fuerWerk = istWerk() && meineStationen(a).length > 0;
+    /* Für eine Werkstatt: ihr Bauteil mit Rahmen, orange, wenn sie dran ist; was im Träger liegt, normal; was fehlt, nur als Umriss */
+    const qMe = istWerk() && meinNr(a) != null ? st(a, meinNr(a)) : null;
+    const fuerWerk = !!qMe && qMe.status !== "abgeschlossen", aktiv = fuerWerk && qMe.status === "in-arbeit" && v === j;
     const teile = liste.map(b => {
       const P = lage.get(b.id);
       if (!P) return "";
       const da = vorhanden(a, b, v), stufe = da ? aktuelleStufe(a, b, v) : stufenVon(a, b)[0];
       const L = stufenRect(b, stufe, P);
       const x = L.x, y = L.y * .8, w = L.w, h = L.h * .8, s = sel === b.id;
-      const mein = fuerWerk ? betrifftMich(a, b) : null, kl = mein == null ? "" : mein ? " mein" : " fremd";
+      const auf = fuerWerk ? teilAufgabe(a, b, qMe) : null, kl = !fuerWerk ? "" : auf ? ` mein${aktiv ? " aktiv" : ""}` : " fremd";
       if (b.form === "modell") {
         const r = cls => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="2" ry="2"/>`;
+        if (fuerWerk) {
+          const ton = auf && aktiv ? ' filter="url(#orangeTon)"' : "";
+          return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}${kl}">${s ? r("halo") : ""}${auf ? r("mein-flaeche") : da ? "" : r("soll-platz")}<image href="${stufe.draufsicht}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"${ton}/>${auf ? r("mein-rahmen") : ""}${s ? r("part sel rahmen") : ""}</g>`;
+        }
         /* Die Station, die jetzt dran ist: Was bei ihr entsteht, hat einen orangen Platz; was sie bearbeitet, ist orange */
         const eigen = mitZiel && !da && jq && b.entsteht === jq.uid && jq.status !== "abgeschlossen";
         const bearbeiten = mitZiel && da && !!zielStufe(a, b, v);
         const ton = bearbeiten ? ' filter="url(#orangeTon)"' : "";
-        return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}${eigen ? " entsteht" : ""}${bearbeiten ? " bearbeiten" : ""}${kl}">${s ? r("halo") : ""}${da ? "" : r("soll-platz" + (eigen ? " ziel" : mein ? " mein" : ""))}<image href="${stufe.draufsicht}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"${ton}/>${mein && da && !bearbeiten ? r("mein-rahmen") : ""}${s ? r("part sel rahmen") : ""}</g>`;
+        return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}${eigen ? " entsteht" : ""}${bearbeiten ? " bearbeiten" : ""}${kl}">${s ? r("halo") : ""}${da ? "" : r("soll-platz" + (eigen ? " ziel" : ""))}<image href="${stufe.draufsicht}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"${ton}/>${s ? r("part sel rahmen") : ""}</g>`;
       }
       const form = cls => (b.form === "rund"
         ? `<ellipse class="${cls}" cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}"/>`
@@ -1761,6 +1774,26 @@ body { font-variant-numeric: tabular-nums; }
   const alleBestaetigt = a => a.stationen.every(q => q.bestaetigt);
   /* Ein Bauteil betrifft die Werkstatt, wenn es bei ihr gefertigt, bearbeitet oder gefügt wird */
   const betrifftMich = (a, b) => meineStationen(a).some(q => betrifft(a, b, q));
+  /* Was eine Station mit einem Bauteil tut: fertigen, bearbeiten oder fügen */
+  function teilAufgabe(a, b, q) {
+    if (!q) return null;
+    if (b.entsteht === q.uid) return b.art === "baugruppe" ? "Fügen" : "Fertigen";
+    if ((b.stufen || []).some(x => x.bei === q.uid)) return "Bearbeiten";
+    const g = b.art === "baugruppe" ? null : gruppeVon(a, b);
+    return g && g.entsteht === q.uid ? "Fügen" : null;
+  }
+  /* Schild mit der Tätigkeit an jedem Bauteil der Werkstatt, oben links am Bauteil */
+  function teilMarken(a, v) {
+    const me = istWerk() ? meinNr(a) : null, q = me != null ? st(a, me) : null;
+    if (!q || q.status === "abgeschlossen") return "";
+    const aktiv = q.status === "in-arbeit" && v === jetzt(a), lage = lageVon(a, v);
+    return zwillingTeile(a, v).map(b => {
+      const auf = teilAufgabe(a, b, q), P = lage.get(b.id);
+      if (!auf || !P) return "";
+      const L = stufenRect(b, vorhanden(a, b, v) ? aktuelleStufe(a, b, v) : stufenVon(a, b)[0], P);
+      return `<span class="teil-marke${aktiv ? " aktiv" : ""}" style="left:${L.x}%;top:${L.y}%">${auf}</span>`;
+    }).join("");
+  }
   const entscheidungText = x => (x.traegt === "kette" ? "Kette wird geändert" : `Station ${x.traegt} trägt die Anpassung`);
 
   /* Aufgaben der Rolle in einem Auftrag, wichtigste zuerst.
@@ -1895,7 +1928,7 @@ body { font-variant-numeric: tabular-nums; }
     }
     const pins = a.anmerkungen.filter(x => (!rueck || x.von <= v) && imZwilling(a, x)).map(x => { const q = pinPos(a, x, v); return q ? pinHtml(a, x, q) : ""; }).join("");
     const traegerSel = ui.kreismenue && !ui.kreismenue.bauteil ? " traeger-sel" : "";
-    const twin = `<div class="twin${traegerSel}" id="twin"${a.traeger ? ` data-kennung="${esc(a.traeger)}"` : ""} data-twin="traeger" role="group" aria-label="Zwilling des Trägers ${a.traeger}">${zwillingSvg(a, ui.kreismenue && ui.kreismenue.bauteil, v, zeigtZiel(a) && v === j)}${pins}</div>`;
+    const twin = `<div class="twin${traegerSel}" id="twin"${a.traeger ? ` data-kennung="${esc(a.traeger)}"` : ""} data-twin="traeger" role="group" aria-label="Zwilling des Trägers ${a.traeger}">${zwillingSvg(a, ui.kreismenue && ui.kreismenue.bauteil, v, zeigtZiel(a) && v === j)}${teilMarken(a, v)}${pins}</div>`;
     let unten;
     if (ui.kreismenue) {
       unten = "";
@@ -2042,7 +2075,7 @@ body { font-variant-numeric: tabular-nums; }
   function peekHtml(a) {
     const antw = a.anmerkungen.filter(x => antwortUngelesen(a, x)).length;
     return `<div class="grip" data-grip="peek" role="button" tabindex="0" aria-label="Unterlagen öffnen"><i class="griff"></i>
-      <div class="peek-row"><p class="ktitel">${state.ich === "AG" ? "Unterlagen" : "Arbeitsgang"}</p><div class="peek-r">${antw ? `<span class="antw">${antw} Antwort <i class="dot"></i></span>` : ""}</div></div></div>`;
+      <div class="peek-row"><p class="ktitel">Unterlagen</p><div class="peek-r">${antw ? `<span class="antw">${antw} Antwort <i class="dot"></i></span>` : ""}</div></div></div>`;
   }
 
   function blattUnterlagen(a) {
@@ -2071,7 +2104,7 @@ body { font-variant-numeric: tabular-nums; }
     }
     const w0 = nr >= 1 && nr <= anzahl(a) ? werkVon(a, nr) : null;
     const arbeitsgang = istWerk() && !nurLesen;
-    const kopf = `<div class="blatt-kopf"><p class="neben">${feld("Auftrag", a.id)}${w0 ? feld("Station", `${nr}, ${w0.verfahren}`) : ""}${nurLesen ? "nur lesen" : ""}</p><h2 class="btitel">${arbeitsgang ? "Arbeitsgang" : "Unterlagen"}</h2></div>`;
+    const kopf = `<div class="blatt-kopf"><p class="neben">${feld("Auftrag", a.id)}${w0 ? feld("Station", `${nr}, ${w0.verfahren}`) : ""}${nurLesen ? "nur lesen" : ""}</p><h2 class="btitel">Unterlagen</h2></div>`;
     if (!w0) return { kopf, body: `<section class="karte">${dokZeilen(a.unterlagen.filter(u => u.station == null)) || '<p class="leer">Keine Unterlagen</p>'}</section>` };
     // Unterlagen, zuerst der Auftragstext dieser Station. Eine Werkstatt sieht nur ihren eigenen.
     const docs = a.unterlagen.filter(u => u.station == null || u.station === nr);
@@ -2100,12 +2133,12 @@ body { font-variant-numeric: tabular-nums; }
         || (x.art === "entscheidung" && beteiligt(a, x, state.ich))).map(x => eigeneZeile(a, x));
       const notizen = (a.notizen || []).filter(n => n.werkstatt === state.ich).map(n => `<div class="zeile notiz"><span class="rest"><span class="text">${esc(n.text)}</span><span class="neben">${fmt(n.zeit)}</span></span>
           <button class="mini-btn" type="button" data-act="notiz-weg" data-id="${n.id}" aria-label="Notiz löschen">×</button></div>`).join("");
-      const notizKarte = `<section class="karte"><h2 class="ktitel">Notizen</h2>${notizen}
+      const notizKarte = `<section class="karte"><h2 class="ktitel">Notizen zum Arbeitsgang</h2>${notizen}
         <label class="feld" style="margin:8px 0 8px"><span class="sr">Neue Notiz</span><textarea data-bind="notiz.text" rows="2">${esc(ui.notiz.text)}</textarea></label>
         <button class="btn umriss block" type="button" data-act="notiz-speichern" id="notizSpeichern" ${ui.notiz.text.trim() ? "" : "disabled"}>Notiz speichern</button></section>`;
       const bestaetigung = a.vorbereitung && !meineStationen(a).every(q => q.bestaetigt)
         ? `<div class="fusszeile"><div class="tasten"><button class="btn umriss" type="button" data-act="rueckfrage">Rückfrage</button><button class="btn pri" type="button" data-act="bestaetigen">Bestätigen</button></div></div>` : "";
-      return { kopf, body: unterlagen + abschnitt("Hinweise", hinweise, "ag-hinweise-" + a.id) + notizKarte + abholung + bestaetigung };
+      return { kopf, body: unterlagen + abschnitt("Hinweise zum Arbeitsgang", hinweise, "ag-hinweise-" + a.id) + notizKarte + abholung + bestaetigung };
     }
     return { kopf, body: unterlagen + stoppKarte + agTeil + abholung + uebernehmen };
   }
@@ -2337,8 +2370,8 @@ body { font-variant-numeric: tabular-nums; }
   function blattAnnehmen(a) {
     const me = meinNr(a);
     const hinweise = a.anmerkungen.filter(x => x.art === "hinweis" && x.bezug === me).map(x => eigeneZeile(a, x));
-    const teile = zwillingTeile(a, me).filter(b => vorhanden(a, b, me)).map(b => [betrifftMich(a, b), b]).sort((p, q) => q[0] - p[0])
-      .map(([m, b]) => `<div class="zeile${m ? "" : " ruhig"}"><span class="rest text">${esc(b.name)}</span>${m ? '<span class="pill st-arbeit">Betrifft Sie</span>' : ""}</div>`).join("");
+    const teile = zwillingTeile(a, me).filter(b => vorhanden(a, b, me)).map(b => [teilAufgabe(a, b, st(a, me)), b]).sort((p, q) => !!q[0] - !!p[0])
+      .map(([auf, b]) => `<div class="zeile${auf ? "" : " ruhig"}"><span class="rest text">${esc(b.name)}</span>${auf ? `<span class="pill st-arbeit">${auf}</span>` : ""}</div>`).join("");
     const kopf = `<div class="blatt-kopf"><p class="neben">${feld("Auftrag", a.id)}${feld("Station", me)}</p><h2 class="btitel">Träger annehmen</h2></div>`;
     const body = (hinweise.length ? `<section class="karte"><h2 class="ktitel">Eingehende Hinweise</h2>${hinweise.join("")}</section>` : "")
       + `<section class="karte"><h2 class="ktitel">Inhalt prüfen</h2>${teile || '<p class="leer">Noch keine Bauteile</p>'}</section>`
@@ -4688,7 +4721,7 @@ body { font-variant-numeric: tabular-nums; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261127162904";
+  const BUILD = "20261127164016";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
