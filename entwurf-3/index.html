@@ -765,20 +765,21 @@ body { font-variant-numeric: tabular-nums; }
 .stufe-knopf .rest { display: grid; gap: 2px; }
 .stufe-knopf .ktitel { font: 700 17px/1.2 var(--font); }
 .stufe-knopf .neben { font-size: 14px; }
-/* Zwilling für eine Werkstatt: drei Zustände, auf einen Blick unterscheidbar.
-   Liegt im Träger: normal. Noch nicht gefertigt: nur ein blasser, gestrichelter Umriss.
-   Ihr Bauteil: durchgehender Rahmen und Schild mit der Tätigkeit; orange, wenn die Station dran ist. */
-.twin g.fremd.geplant image { opacity: .14; }
-.twin g.mein.geplant image { opacity: .55; }
-.mein-flaeche { fill: var(--surface); stroke: none; }
-.twin g.mein.aktiv .mein-flaeche { fill: var(--accent-soft); }
-.mein-rahmen { fill: none; stroke: var(--ink); stroke-width: 2px; vector-effect: non-scaling-stroke; }
-.twin g.mein.aktiv .mein-rahmen { stroke: var(--accent); stroke-width: 2.4px; }
-.twin g.mein .part { stroke: var(--ink); stroke-width: 2px; stroke-dasharray: none; }
+/* Zwilling: jedes Bauteil als eingefrorene 3D-Ansicht. Liegt im Träger: neutral. Noch nicht gefertigt: durchscheinend.
+   Das Bauteil, das die Station jetzt fertigt, bearbeitet oder fügt: orange schattiert und leicht pulsierend. Keine Rahmen. */
+.twin g.geplant image { opacity: .3; }
+.twin g.mein.geplant image { opacity: .6; }
+.twin g.mein.aktiv image, .twin g.entsteht image, .twin g.bearbeiten image { opacity: 1; }
+.twin g.mein .part { stroke: var(--ink); stroke-width: 1.6px; stroke-dasharray: none; }
 .twin g.mein.aktiv .part { stroke: var(--accent); fill: var(--accent-soft); }
-.teil-marke { position: absolute; z-index: 1; transform: translate(-2px, -60%); pointer-events: none; white-space: nowrap;
-  padding: 2px 7px; border-radius: 4px; background: var(--ink); color: var(--surface); font: 600 12px/16px var(--font); }
-.teil-marke.aktiv { background: var(--accent); color: var(--ink); }
+.twin g.mein.aktiv, .twin g.entsteht, .twin g.bearbeiten { transform-box: fill-box; transform-origin: center; animation: teil-puls 1.8s ease-in-out infinite; }
+@keyframes teil-puls { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@media (prefers-reduced-motion: reduce) { .twin g.mein.aktiv, .twin g.entsteht, .twin g.bearbeiten { animation: none !important; } }
+.twin .trenner { stroke: var(--line); }
+.teil-marke { position: absolute; z-index: 1; transform: translateY(-50%); pointer-events: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px 2px 6px; border-radius: 6px; background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); font: 600 12px/16px var(--font); }
+.teil-marke i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); flex: 0 0 auto; }
+.teil-marke.aktiv i { background: var(--accent); }
 /* Arbeitsgang: eigene Notizen */
 .zeile.notiz .text { white-space: pre-wrap; }
 /* Zustand mit Stand je Station: was bestätigt ist, was aussteht */
@@ -1675,7 +1676,7 @@ body { font-variant-numeric: tabular-nums; }
      Noch nicht gefertigte Teile erscheinen blass an ihrem Platz, gefertigte kräftig. */
   function zwillingSvg(a, sel, v = jetzt(a), mitZiel = false) {
     const lage = lageVon(a, v), liste = zwillingTeile(a, v), j = jetzt(a), jq = st(a, j);
-    /* Für eine Werkstatt: ihr Bauteil mit Rahmen, orange, wenn sie dran ist; was im Träger liegt, normal; was fehlt, nur als Umriss */
+    /* Für eine Werkstatt: was im Träger liegt, deckend; was noch fehlt, durchscheinend; ihr Bauteil orange und pulsierend, wenn sie dran ist */
     const qMe = istWerk() && meinNr(a) != null ? st(a, meinNr(a)) : null;
     const fuerWerk = !!qMe && qMe.status !== "abgeschlossen", aktiv = fuerWerk && qMe.status === "in-arbeit" && v === j;
     const teile = liste.map(b => {
@@ -1685,23 +1686,22 @@ body { font-variant-numeric: tabular-nums; }
       const L = stufenRect(b, stufe, P);
       const x = L.x, y = L.y * .8, w = L.w, h = L.h * .8, s = sel === b.id;
       const auf = fuerWerk ? teilAufgabe(a, b, qMe) : null, kl = !fuerWerk ? "" : auf ? ` mein${aktiv ? " aktiv" : ""}` : " fremd";
-      if (b.form === "modell") {
-        const r = cls => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="2" ry="2"/>`;
-        if (fuerWerk) {
-          const ton = auf && aktiv ? ' filter="url(#orangeTon)"' : "";
-          return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}${kl}">${s ? r("halo") : ""}${auf ? r("mein-flaeche") : da ? "" : r("soll-platz")}<image href="${stufe.draufsicht}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"${ton}/>${auf ? r("mein-rahmen") : ""}${s ? r("part sel rahmen") : ""}</g>`;
-        }
-        /* Die Station, die jetzt dran ist: Was bei ihr entsteht, hat einen orangen Platz; was sie bearbeitet, ist orange */
-        const eigen = mitZiel && !da && jq && b.entsteht === jq.uid && jq.status !== "abgeschlossen";
-        const bearbeiten = mitZiel && da && !!zielStufe(a, b, v);
-        const ton = bearbeiten ? ' filter="url(#orangeTon)"' : "";
-        return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}${eigen ? " entsteht" : ""}${bearbeiten ? " bearbeiten" : ""}${kl}">${s ? r("halo") : ""}${da ? "" : r("soll-platz" + (eigen ? " ziel" : ""))}<image href="${stufe.draufsicht}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none"${ton}/>${s ? r("part sel rahmen") : ""}</g>`;
+      /* Eingefrorene 3D-Ansicht. Orange: bei der Werkstatt ihr Bauteil, wenn sie dran ist; beim Auftraggeber, was die Station, die dran ist, fertigt oder bearbeitet */
+      let orange, kls;
+      if (fuerWerk) { orange = !!(auf && aktiv); kls = kl; }
+      else {
+        const eigen = mitZiel && !da && jq && b.entsteht === jq.uid && jq.status !== "abgeschlossen", bearbeiten = mitZiel && da && b.form === "modell" && !!zielStufe(a, b, v);
+        orange = eigen || bearbeiten; kls = eigen ? " entsteht" : bearbeiten ? " bearbeiten" : "";
       }
+      const farbe = orange ? "orange" : "neutral", W = Math.max(8, Math.round(w * 8)), H = Math.max(8, Math.round(h * 8));
+      const mid = b.form === "modell" ? stufe.modell : koerperId(b, w, h);
+      const bild = standbildVon(mid, W, H, farbe) || (b.form === "modell" ? stufe.draufsicht : "");
+      if (bild) return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}${kls}"><image class="teil-bild" href="${bild}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="none" data-farbe="${farbe}" data-modell="${mid}"/></g>`;
+      /* Ohne WebGL: flache Form */
       const form = cls => (b.form === "rund"
         ? `<ellipse class="${cls}" cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}"/>`
         : `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="3.4" ry="3.4"/>`);
-      const eigenF = mitZiel && !da && jq && b.entsteht === jq.uid && jq.status !== "abgeschlossen";
-      return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}${eigenF ? " entsteht" : ""}${kl}">${s ? form("halo") : ""}${form(s ? "part sel" : "part")}</g>`;
+      return `<g data-bt="${b.id}" class="${da ? "da" : "geplant"}${kls}">${form(s ? "part sel" : "part")}</g>`;
     }).join("");
     const modelle = liste.filter(b => b.form === "modell" && lage.get(b.id)).map(b => lage.get(b.id)).sort((p, q) => p.x - q.x);
     let linien = "";
@@ -1712,6 +1712,44 @@ body { font-variant-numeric: tabular-nums; }
     }
     return `<svg viewBox="0 0 100 80" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${linien}${teile}</svg>`;
   }
+  /* Bauteil ohne Modell: ein schlichter Körper, Quader oder Zylinder, in der Grundfläche des Platzhalters */
+  function koerperId(b, w, h) {
+    const id = `K|${b.form === "rund" ? "rund" : "eckig"}|${Math.round(w * 10)}x${Math.round(h * 10)}`;
+    if (!MODELLE.has(id)) MODELLE.set(id, koerper(b.form === "rund", w, h));
+    return id;
+  }
+  function koerper(rund, w, h) {
+    const t = Math.min(w, h) * .2, X = w / 2, Z = h / 2, pos = [], nor = [];
+    const drei = (p, q, r, n) => { pos.push(...p, ...q, ...r); nor.push(...(n || [0, 0, 0]), ...(n || [0, 0, 0]), ...(n || [0, 0, 0])); };
+    const vier = (p, q, r, s, n) => { drei(p, q, r, n); drei(p, r, s, n); };
+    if (!rund) {
+      vier([-X, t, -Z], [-X, t, Z], [X, t, Z], [X, t, -Z], [0, 1, 0]);
+      vier([-X, 0, -Z], [X, 0, -Z], [X, 0, Z], [-X, 0, Z], [0, -1, 0]);
+      vier([-X, 0, Z], [X, 0, Z], [X, t, Z], [-X, t, Z], [0, 0, 1]);
+      vier([-X, 0, -Z], [-X, t, -Z], [X, t, -Z], [X, 0, -Z], [0, 0, -1]);
+      vier([X, 0, -Z], [X, t, -Z], [X, t, Z], [X, 0, Z], [1, 0, 0]);
+      vier([-X, 0, -Z], [-X, 0, Z], [-X, t, Z], [-X, t, -Z], [-1, 0, 0]);
+    } else {
+      const n = 64;
+      for (let i = 0; i < n; i++) {
+        const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2, c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
+        drei([0, t, 0], [X * c1, t, Z * s1], [X * c0, t, Z * s0], [0, 1, 0]);
+        drei([0, 0, 0], [X * c0, 0, Z * s0], [X * c1, 0, Z * s1], [0, -1, 0]);
+        const n0 = [c0 * Z, 0, s0 * X], n1 = [c1 * Z, 0, s1 * X], l0 = Math.hypot(n0[0], n0[2]), l1 = Math.hypot(n1[0], n1[2]);
+        pos.push(X * c0, 0, Z * s0, X * c1, 0, Z * s1, X * c1, t, Z * s1, X * c0, 0, Z * s0, X * c1, t, Z * s1, X * c0, t, Z * s0);
+        nor.push(n0[0] / l0, 0, n0[2] / l0, n1[0] / l1, 0, n1[2] / l1, n1[0] / l1, 0, n1[2] / l1, n0[0] / l0, 0, n0[2] / l0, n1[0] / l1, 0, n1[2] / l1, n0[0] / l0, 0, n0[2] / l0);
+      }
+    }
+    return { pos: new Float32Array(pos), nor: new Float32Array(nor), min: [-X, 0, -Z], max: [X, t, Z], ext: [w, t, h] };
+  }
+  /* Standbild eines Modells; fehlt das Modell im Speicher, wird es geholt und danach neu gezeichnet */
+  const HOLT = new Set();
+  function standbildVon(id, W, H, farbe) {
+    if (!id) return null;
+    const url = Ansicht.standbild(id, W, H, farbe);
+    if (!url && !MODELLE.has(id) && !HOLT.has(id)) { HOLT.add(id); modellHolen(id).then(m => { if (m) nachLaden(); }); }
+    return url;
+  }
   /* Lage eines Pins auf dem Zwilling; null, wenn sein Bauteil gerade nicht zu sehen ist */
   function pinPos(a, x, v = jetzt(a)) {
     if (!x.bauteil) return { x: klemme(x.stelle.x * 100, 4, 96), y: klemme(x.stelle.y * 100, 5, 95) };
@@ -1720,6 +1758,11 @@ body { font-variant-numeric: tabular-nums; }
     const b = a.bauteile.find(q => q.id === x.bauteil);
     const stufe = b && x.modell ? stufenVon(a, b).find(q => q.modell && q.modell === x.modell) : (b ? stufenVon(a, b)[0] : null);
     const L = b ? stufenRect(b, stufe, P) : P;
+    const mid = b && b.form === "modell" ? stufe && stufe.modell : b ? koerperId(b, L.w, L.h * .8) : null;
+    if (mid) {
+      const q = Ansicht.standPunkt(mid, Math.max(8, Math.round(L.w * 8)), Math.max(8, Math.round(L.h * .8 * 8)), x);
+      if (q) return { x: klemme(L.x + q.x * L.w, 4, 96), y: klemme(L.y + q.y * L.h, 5, 95) };
+    }
     return { x: klemme(L.x + x.stelle.x * L.w, 4, 96), y: klemme(L.y + x.stelle.y * L.h, 5, 95) };
   }
   function pinAria(a, x) {
@@ -1791,7 +1834,7 @@ body { font-variant-numeric: tabular-nums; }
       const auf = teilAufgabe(a, b, q), P = lage.get(b.id);
       if (!auf || !P) return "";
       const L = stufenRect(b, vorhanden(a, b, v) ? aktuelleStufe(a, b, v) : stufenVon(a, b)[0], P);
-      return `<span class="teil-marke${aktiv ? " aktiv" : ""}" style="left:${L.x}%;top:${L.y}%">${auf}</span>`;
+      return `<span class="teil-marke${aktiv ? " aktiv" : ""}" style="left:${L.x}%;top:${L.y}%"><i></i>${auf}</span>`;
     }).join("");
   }
   const entscheidungText = x => (x.traegt === "kette" ? "Kette wird geändert" : `Station ${x.traegt} trägt die Anpassung`);
@@ -2885,9 +2928,9 @@ body { font-variant-numeric: tabular-nums; }
       const vz = R[2][0] * p[0] + R[2][1] * p[1] + R[2][2] * p[2] - k.D;
       return { x: (k.t / k.asp * vx / -vz + 1) / 2 * k.W, y: (1 - k.t * vy / -vz) / 2 * k.H, v: [vx, vy, vz] };
     }
-    function strahl(o, d) {
+    function strahl(o, d, mm = m) {
       let best = Infinity, bi = -1;
-      const P = m.pos;
+      const P = mm.pos;
       for (let i = 0; i < P.length; i += 9) {
         const e1x = P[i + 3] - P[i], e1y = P[i + 4] - P[i + 1], e1z = P[i + 5] - P[i + 2];
         const e2x = P[i + 6] - P[i], e2y = P[i + 7] - P[i + 1], e2z = P[i + 8] - P[i + 2];
@@ -2904,7 +2947,7 @@ body { font-variant-numeric: tabular-nums; }
         if (t > 1e-9 && t < best) { best = t; bi = i; }
       }
       if (bi < 0) return null;
-      return { punkt: [o[0] + d[0] * best, o[1] + d[1] * best, o[2] + d[2] * best], normal: [m.nor[bi], m.nor[bi + 1], m.nor[bi + 2]] };
+      return { punkt: [o[0] + d[0] * best, o[1] + d[1] * best, o[2] + d[2] * best], normal: [mm.nor[bi], mm.nor[bi + 1], mm.nor[bi + 2]] };
     }
     function stelleVon(p) {
       return { x: klemme((p[0] - m.min[0]) / (m.ext[0] || 1), 0, 1), y: klemme((p[2] - m.min[2]) / (m.ext[2] || 1), 0, 1) };
@@ -2932,7 +2975,82 @@ body { font-variant-numeric: tabular-nums; }
         el.classList.toggle("hinten", !vorn);
       });
     }
+    /* Standbild für den Zwilling: dieselbe Drehung und Schattierung wie beim Antippen eines Bauteils, eingefroren.
+       Senkrecht projiziert und eng in den Platz des Bauteils eingepasst; neutral oder orange. */
+    let sgl = null, scv = null, sprog = null, sloc = null, sP = null, sN = null, sKein = false;
+    const BILDER = new Map(), HUELLE = new Map();
+    const STAND_R = (() => { const cy = Math.cos(-0.55), sy = Math.sin(-0.55), cp = Math.cos(0.5), sp = Math.sin(0.5); return [[cy, 0, sy], [sp * sy, cp, -sp * cy], [-cp * sy, sp, cp * cy]]; })();
+    function sstart() {
+      if (sgl || sKein) return !!sgl;
+      scv = document.createElement("canvas");
+      sgl = scv.getContext("webgl", { antialias: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: true });
+      if (!sgl) { sKein = true; return false; }
+      const sh = (typ, src) => { const s = sgl.createShader(typ); sgl.shaderSource(s, src); sgl.compileShader(s); return s; };
+      sprog = sgl.createProgram();
+      sgl.attachShader(sprog, sh(sgl.VERTEX_SHADER, VS)); sgl.attachShader(sprog, sh(sgl.FRAGMENT_SHADER, FS));
+      sgl.linkProgram(sprog);
+      if (!sgl.getProgramParameter(sprog, sgl.LINK_STATUS)) { sKein = true; sgl = null; return false; }
+      sloc = { p: sgl.getAttribLocation(sprog, "p"), n: sgl.getAttribLocation(sprog, "n"), mvp: sgl.getUniformLocation(sprog, "mvp"),
+        rot: sgl.getUniformLocation(sprog, "rot"), hell: sgl.getUniformLocation(sprog, "hell"), dunkel: sgl.getUniformLocation(sprog, "dunkel") };
+      sP = sgl.createBuffer(); sN = sgl.createBuffer();
+      return true;
+    }
+    function standKamera(mm, W, H) {
+      const R = STAND_R;
+      let h = HUELLE.get(mm);
+      if (!h) {
+        h = { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity, z0: Infinity, z1: -Infinity };
+        const P = mm.pos;
+        for (let i = 0; i < P.length; i += 3) {
+          const vx = R[0][0] * P[i] + R[0][1] * P[i + 1] + R[0][2] * P[i + 2], vy = R[1][0] * P[i] + R[1][1] * P[i + 1] + R[1][2] * P[i + 2], vz = R[2][0] * P[i] + R[2][1] * P[i + 1] + R[2][2] * P[i + 2];
+          if (vx < h.x0) h.x0 = vx; if (vx > h.x1) h.x1 = vx; if (vy < h.y0) h.y0 = vy; if (vy > h.y1) h.y1 = vy; if (vz < h.z0) h.z0 = vz; if (vz > h.z1) h.z1 = vz;
+        }
+        HUELLE.set(mm, h);
+      }
+      const s = Math.min(W / ((h.x1 - h.x0) || 1), H / ((h.y1 - h.y0) || 1)) * 0.9;
+      return { R, s, cx: (h.x0 + h.x1) / 2, cy: (h.y0 + h.y1) / 2, z0: h.z0, z1: h.z1, W, H };
+    }
+    function standbild(id, W, H, farbe) {
+      const mm = MODELLE.get(id);
+      if (!mm || !mm.pos) return null;
+      const key = `${id}|${farbe}|${W}x${H}`;
+      if (BILDER.has(key)) return BILDER.get(key);
+      if (!sstart()) return null;
+      const k = standKamera(mm, W, H), R = k.R, g = sgl;
+      const ax = 2 * k.s / W, ay = 2 * k.s / H, dz = (k.z1 - k.z0) || 1, az = -2 / dz;
+      const bx = -k.cx * ax, by = -k.cy * ay, bz = 1 + 2 * k.z0 / dz;
+      const mvp = new Float32Array([ax * R[0][0], ay * R[1][0], az * R[2][0], 0, ax * R[0][1], ay * R[1][1], az * R[2][1], 0, ax * R[0][2], ay * R[1][2], az * R[2][2], 0, bx, by, bz, 1]);
+      scv.width = W; scv.height = H;
+      g.viewport(0, 0, W, H); g.clearColor(0, 0, 0, 0); g.clear(g.COLOR_BUFFER_BIT | g.DEPTH_BUFFER_BIT); g.enable(g.DEPTH_TEST);
+      g.useProgram(sprog);
+      g.uniformMatrix4fv(sloc.mvp, false, mvp);
+      g.uniformMatrix3fv(sloc.rot, false, new Float32Array([R[0][0], R[1][0], R[2][0], R[0][1], R[1][1], R[2][1], R[0][2], R[1][2], R[2][2]]));
+      const weiss = tokenFarbe("--card"), akz = tokenFarbe("--accent");
+      if (farbe === "orange") { g.uniform3fv(sloc.hell, akz.map((c, i) => c + (weiss[i] - c) * 0.55)); g.uniform3fv(sloc.dunkel, akz.map(c => c * 0.72)); }
+      else { const gr = tokenFarbe("--grey"); g.uniform3fv(sloc.hell, weiss); g.uniform3fv(sloc.dunkel, gr.map((c, i) => c + (weiss[i] - c) * 0.4)); }
+      g.bindBuffer(g.ARRAY_BUFFER, sP); g.bufferData(g.ARRAY_BUFFER, mm.pos, g.STATIC_DRAW); g.enableVertexAttribArray(sloc.p); g.vertexAttribPointer(sloc.p, 3, g.FLOAT, false, 0, 0);
+      g.bindBuffer(g.ARRAY_BUFFER, sN); g.bufferData(g.ARRAY_BUFFER, mm.nor, g.STATIC_DRAW); g.enableVertexAttribArray(sloc.n); g.vertexAttribPointer(sloc.n, 3, g.FLOAT, false, 0, 0);
+      g.drawArrays(g.TRIANGLES, 0, mm.pos.length / 3);
+      const url = scv.toDataURL("image/png");
+      BILDER.set(key, url);
+      return url;
+    }
+    /* Lage eines Punkts auf dem Standbild, als Anteil von Breite und Höhe */
+    function standPunkt(id, W, H, x) {
+      const mm = MODELLE.get(id);
+      if (!mm || !mm.pos) return null;
+      let p = x.punkt;
+      if (!p) {
+        const px = mm.min[0] + x.stelle.x * mm.ext[0], pz = mm.min[2] + x.stelle.y * mm.ext[2];
+        const h = strahl([px, mm.max[1] + 1, pz], [0, -1, 0], mm);
+        p = h ? h.punkt : [px, mm.max[1], pz];
+      }
+      const k = standKamera(mm, W, H), R = k.R;
+      const vx = R[0][0] * p[0] + R[0][1] * p[1] + R[0][2] * p[2], vy = R[1][0] * p[0] + R[1][1] * p[1] + R[1][2] * p[2];
+      return { x: (W / 2 + (vx - k.cx) * k.s) / W, y: (H / 2 - (vy - k.cy) * k.s) / H };
+    }
     return {
+      standbild, standPunkt,
       anbinden(s, a) {
         slot = s;
         const b = a.bauteile.find(q => q.id === s.dataset.bt);
@@ -4721,7 +4839,7 @@ body { font-variant-numeric: tabular-nums; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261127164016";
+  const BUILD = "20261127173132";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
