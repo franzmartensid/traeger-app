@@ -781,9 +781,9 @@ body { font-variant-numeric: tabular-nums; }
 .teil-marke i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); flex: 0 0 auto; }
 .teil-marke.aktiv i { background: var(--accent); }
 /* Eigener Schritt: großer Kreis neben dem Verfahren, derselbe Kreis in der Kette und im Verlauf */
-.kopf-l > .titelzeile { order: 1; display: flex; align-items: center; gap: 12px; min-width: 0; }
-.titelzeile .titel { margin: 0; min-width: 0; }
-.schritt-kreis { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 700 19px/1 var(--font);
+.kopf-l > .schritt-zeile { order: 2; display: flex; align-items: center; gap: 8px; margin: 8px 0 0; }
+.schritt-zeile .lk-n { font: 500 16px/1.3 var(--font); color: var(--grey); }
+.schritt-kreis { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 700 17px/1 var(--font);
   background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 2.5px var(--ink); }
 .schritt-kreis.n-jetzt { background: var(--accent); color: #fff; box-shadow: none; }
 .schritt-kreis.n-fertig { background: var(--ink); color: var(--surface); box-shadow: none; }
@@ -1862,19 +1862,19 @@ body { font-variant-numeric: tabular-nums; }
     const L = [], ich = state.ich;
     const t = (rang, o) => L.push(Object.assign({ rang, a }, o));
     if (ich === "AG") {
-      offeneStopps(a).forEach(x => t(1, { art: "stopp", von: `Station ${x.von}`, an: "Sie", info: x.rueckfrage ? "Rückfrage zu den Unterlagen" : "Stop, Station wartet",
+      offeneStopps(a).forEach(x => t(1, { art: "stopp", fluss: vonMit(a, x.von),
         titel: x.rueckfrage ? "Rückfrage beantworten" : "Stop beantworten", kontext: werkVon(a, x.von).name, inhalt: meldungInhalt(a, x), knopf: "Antworten", act: "pin", id: x.id }));
-      offeneEntscheidungen(a).forEach(x => t(2, { art: "entscheidung", von: `Station ${x.von}`, an: "Sie", info: `Entscheidung, betrifft Station ${x.bezug}`,
+      offeneEntscheidungen(a).forEach(x => t(2, { art: "entscheidung", fluss: vonMit(a, x.von),
         titel: "Anpassung zuordnen", kontext: werkVon(a, x.von).name, inhalt: meldungInhalt(a, x), knopf: "Entscheiden", act: "pin", id: x.id }));
       if (a.vorbereitung) {
         const fehlen = a.stationen.filter(q => !q.bestaetigt);
-        if (!fehlen.length && !offeneStopps(a).length) t(3, { von: "Sie", an: "Logistik, Station 1", titel: "Durchlauf starten", act: "durchlauf-starten" });
+        if (!fehlen.length && !offeneStopps(a).length) t(3, { fluss: gehtAn(a, 1), titel: "Durchlauf starten", act: "durchlauf-starten" });
         else if (fehlen.length) t(6, { zustand: true, titel: "Start wartet auf Bestätigung der Unterlagen", kontext: "",
           zeilen: a.stationen.map(q => [`Station ${q.nr}, ${WERK[q.werkstatt].name}`, wartet(a, q.nr) ? "Rückfrage offen" : q.bestaetigt ? "bestätigt" : "ausstehend"]) });
       }
-      if (a.zurueck && !a.abgeschlossen) t(4, { von: "Alle Stationen", an: "Sie", info: "Gesammelte Meldungen und Serie",
+      if (a.zurueck && !a.abgeschlossen) t(4, { fluss: "Von allen Stationen",
         titel: "Auswerten", kontext: `${a.anmerkungen.length} Meldungen, davon ${a.anmerkungen.filter(x => x.art === "serie").length} Serie`, knopf: "Auswerten", act: "unterlagen-auf" });
-      if (a.abgeschlossen && !a.freigegeben) t(5, { von: "Sie", an: "Netzwerk", info: "Träger frei für den nächsten Auftrag",
+      if (a.abgeschlossen && !a.freigegeben) t(5, {
         titel: "Träger freigeben", kontext: `Träger ${a.traeger}, Unterlagen übernommen`, knopf: "Freigeben", act: "unterlagen-auf" });
       return L.sort((p, q) => p.rang - q.rang);
     }
@@ -1883,32 +1883,34 @@ body { font-variant-numeric: tabular-nums; }
     const s = st(a, me), w = werkVon(a, me), Lg = a.logistik;
     a.anmerkungen.forEach(x => {
       if (x.art === "stopp" && rolleVon(a, x.von) === ich) {
-        if (x.offen) t(2, { zustand: true, art: "stopp", titel: `${artName(x)} gesendet`, kontext: "Antwort des Auftraggebers ausstehend", act: "pin", id: x.id });
-        else if (antwortUngelesen(a, x)) t(1, { art: "stopp", von: "Auftraggeber", an: "Sie", info: `Antwort zu ${artName(x)}`, titel: "Antwort lesen", kontext: meldungInhalt(a, x),
+        if (x.offen) t(2, { zustand: true, art: "stopp", titel: `${artName(x)} gesendet`, kontext: "Wartet auf Antwort des Auftraggebers", act: "pin", id: x.id });
+        else if (antwortUngelesen(a, x)) t(1, { art: "stopp", fluss: "Vom Auftraggeber", titel: "Antwort lesen", kontext: meldungInhalt(a, x),
           inhalt: (x.antworten[x.antworten.length - 1] || {}).abschrift || "", knopf: "Öffnen", act: "pin", id: x.id });
       }
       if (x.art === "entscheidung" && beteiligt(a, x, ich)) {
-        if (x.offen) t(4, { zustand: true, art: "entscheidung", titel: "Entscheidung ausstehend", kontext: `Anpassung an Station ${x.bezug}, Auftraggeber entscheidet`, act: "pin", id: x.id });
-        else if (anmUngelesen(a, x) || antwortUngelesen(a, x)) t(1, { art: "entscheidung", von: "Auftraggeber", an: "Sie", info: "Entscheidung", titel: "Entscheidung lesen", kontext: entscheidungText(x), knopf: "Öffnen", act: "pin", id: x.id });
+        if (x.offen) t(4, { zustand: true, art: "entscheidung", titel: "Entscheidung ausstehend", kontext: `Anpassung an Station ${x.bezug}`, act: "pin", id: x.id });
+        else if (anmUngelesen(a, x) || antwortUngelesen(a, x)) t(1, { art: "entscheidung", fluss: "Vom Auftraggeber", titel: "Entscheidung lesen", kontext: entscheidungText(x), knopf: "Öffnen", act: "pin", id: x.id });
       }
     });
     const hinweise = a.anmerkungen.filter(x => x.art === "hinweis" && x.bezug === me && anmUngelesen(a, x));
-    if (hinweise.length && s.status === "in-arbeit") t(3, { art: "hinweis", von: `Station ${hinweise[0].von}`, an: "Sie", info: "Hinweise zu diesem Arbeitsschritt", titel: hinweise.length > 1 ? `${hinweise.length} Hinweise lesen` : "Hinweis lesen",
+    if (hinweise.length && s.status === "in-arbeit") t(3, { art: "hinweis", fluss: vonMit(a, hinweise[0].von), titel: hinweise.length > 1 ? `${hinweise.length} Hinweise lesen` : "Hinweis lesen",
       kontext: `Von Station ${hinweise[0].von}, ${werkVon(a, hinweise[0].von).name}`, inhalt: meldungInhalt(a, hinweise[0]), knopf: "Öffnen", act: "pin", id: hinweise[0].id });
     if (a.vorbereitung) {
-      if (!meineStationen(a).every(q => q.bestaetigt)) { if (!wartet(a, me)) t(5, { von: "Auftraggeber", an: "Sie", titel: "Unterlagen prüfen", act: "unterlagen-auf" }); }
-      else t(7, { zustand: true, titel: "Unterlagen bestätigt", kontext: "Start des Durchlaufs durch den Auftraggeber ausstehend" });
+      if (!meineStationen(a).every(q => q.bestaetigt)) { if (!wartet(a, me)) t(5, { fluss: "Vom Auftraggeber", titel: "Unterlagen prüfen", act: "unterlagen-auf" }); }
+      else t(7, { zustand: true, titel: "Unterlagen bestätigt", kontext: "Wartet auf Start durch den Auftraggeber" });
     }
     else if (s.status === "lieferung") {
-      if (Lg && Lg.nach === me && Lg.status === "zugestellt") t(0, { von: "Sie", an: "Auftraggeber", info: "Status: angenommen", titel: "Träger annehmen", kontext: `Zugestellt um ${fmtUhr(Lg.zugestellt)}`, knopf: "Annehmen", act: "annehmen-auf" });
-      else t(6, { zustand: true, titel: "Träger unterwegs zu Ihnen", kontext: Lg && Lg.nach === me ? logistikStand(Lg) : "Abholung durch die Logistik ausstehend" });
-    } else if (s.status === "in-arbeit") t(6, { von: "Sie", an: me + 1 <= anzahl(a) ? `Logistik, Station ${me + 1}` : "Logistik, Auftraggeber", info: "Schritt fertig, Träger abholbereit", titel: "Schritt abschließen", kontext: `${w.verfahren}, Station ${me} von ${anzahl(a)}`, knopf: "Abschließen", act: "fertigstellen" });
+      if (Lg && Lg.nach === me && Lg.status === "zugestellt") t(0, { fluss: vonMit(a, Lg.von), titel: "Träger annehmen", kontext: `Zugestellt um ${fmtUhr(Lg.zugestellt)}`, knopf: "Annehmen", act: "annehmen-auf" });
+      else t(6, { zustand: true, titel: "Träger unterwegs zu Ihnen", kontext: Lg && Lg.nach === me ? logistikStand(Lg) : "Wartet auf Abholung durch die Logistik" });
+    } else if (s.status === "in-arbeit") t(6, { fluss: gehtAn(a, me + 1), titel: "Schritt abschließen", kontext: `${w.verfahren}, Station ${me} von ${anzahl(a)}`, knopf: "Abschließen", act: "fertigstellen" });
     else if (s.status === "geplant") t(7, { zustand: true, titel: "Arbeitsschritt geplant", kontext: `Träger zurzeit ${traegerOrt(a)}` });
     else t(8, { zustand: true, titel: "Arbeitsschritt abgeschlossen", kontext: Lg && Lg.von === me ? `${logistikStand(Lg)}, Ziel: ${ort(a, Lg.nach).name}` : "" });
     return L.sort((p, q) => p.rang - q.rang);
   }
   const datenVon = t => (t.act ? `data-act="${t.act}"${t.id ? ` data-id="${t.id}"` : ""}${t.a ? ` data-auftrag="${t.a.id}"` : ""}` : "");
-  const richtung = t => (!t.von ? "" : t.von === "Sie" ? (t.an && t.an !== "Netzwerk" ? `An ${t.an}` : "") : t.von === "Alle Stationen" ? "Von allen Stationen" : `Von ${t.von}`);
+  const richtung = t => t.fluss || "";
+  const vonMit = (a, nr) => (nr === 0 || nr === ende(a) ? "Vom Auftraggeber" : `Von Station ${nr}, ${werkVon(a, nr).name}`);
+  const gehtAn = (a, nr) => (nr === 0 || nr >= ende(a) ? "Träger geht zurück an den Auftraggeber" : `Träger geht an Station ${nr}, ${werkVon(a, nr).name}`);
   /* Fokus: die eine Übergabe, die jetzt ansteht. Eine Zeile, wer beteiligt ist, darunter die Handlung als Hauptknopf. */
   function fokusHtml(t, mitAuftrag) {
     if (t.zustand) {
@@ -1935,7 +1937,7 @@ body { font-variant-numeric: tabular-nums; }
     const tun = alle.filter(t => !t.zustand).sort((p, q) => p.rang - q.rang);
     /* Zustände zu Meldungen (Stop offen, Entscheidung ausstehend) stehen ruhig unter den Aufgaben */
     const ruhe = alle.filter(t => t.zustand && t.act).map(t => aufgabeZeile(t, liste.length > 1));
-    if (ag && !liste.length) tun.push({ rang: 9, von: "Sie", an: "Alle Betriebe", info: "Auftrag und digitaler Zwilling, an den Träger gekoppelt", titel: "Auftrag anlegen", kontext: "Träger koppeln, Stationen und Bauteile festlegen", knopf: "Anlegen", act: "projekt-neu" });
+    if (ag && !liste.length) tun.push({ rang: 9, titel: "Auftrag anlegen", kontext: "Träger koppeln, Stationen und Bauteile festlegen", knopf: "Anlegen", act: "projekt-neu" });
     let hinter;
     if (ag) {
       hinter = liste.map(a => { const j = jetzt(a); return `<button class="zeile" type="button" data-act="oeffne-traeger" data-id="${a.id}"><span class="rest"><span class="text">${esc(a.titel)}</span>
@@ -1966,7 +1968,7 @@ body { font-variant-numeric: tabular-nums; }
     }
     const me = meinNr(a), s = st(a, me), w = WERK[s.werkstatt];
     const z = schrittStand(a, me);
-    return `<div class="head"><div class="kopf-l"><div class="titelzeile"><h1 class="titel">${esc(w.verfahren)}</h1><span class="schritt-kreis ${knotenKlasse(a, me, jetzt(a))}" aria-label="Station ${me} von ${anzahl(a)}">${me}</span></div><p class="neben">${feld("Auftrag", a.id)}</p></div><div class="kopf-r"><span class="pill ${STAND_KLASSE[z]}">${z}</span></div></div>`;
+    return `<div class="head"><div class="kopf-l"><h1 class="titel">${esc(w.verfahren)}</h1><p class="schritt-zeile"><span class="lk-n">Schritt:</span><span class="schritt-kreis ${knotenKlasse(a, me, jetzt(a))}" aria-label="Station ${me} von ${anzahl(a)}">${me}</span></p><p class="neben">${feld("Auftrag", a.id)}</p></div><div class="kopf-r"><span class="pill ${STAND_KLASSE[z]}">${z}</span></div></div>`;
   }
 
   function logistikStand(L) {
@@ -2113,11 +2115,10 @@ body { font-variant-numeric: tabular-nums; }
       inhalt = `<section class="karte"><h2 class="ktitel">Kein Transport offen</h2><p class="neben">Der Träger ist ${esc(wo)}.</p></section>`;
     } else {
       const von = ort(a, L.von), nach = ort(a, L.nach);
-      const vonN = L.von === 0 ? "Auftraggeber" : `Station ${L.von}`, nachN = L.nach === ende(a) ? "Auftraggeber" : `Station ${L.nach}`;
       const taste = L.status === "angefragt"
-        ? fokusHtml({ von: vonN, an: "Sie", info: L.von === 0 ? "Durchlauf gestartet, Träger abholbereit" : "Schritt fertig, Träger abholbereit", titel: "Abholung bestätigen", kontext: `${von.name}, ${von.adresse}`, knopf: "Abgeholt", act: "log-abholen" })
+        ? fokusHtml({ titel: "Abholung bestätigen", kontext: `${von.name}, ${von.adresse}`, knopf: "Abgeholt", act: "log-abholen" })
         : L.status === "abgeholt"
-          ? fokusHtml({ von: "Sie", an: nachN, info: "Träger zustellen", titel: "Zustellung bestätigen", kontext: `${nach.name}, ${nach.adresse}`, knopf: "Zugestellt", act: "log-zustellen" })
+          ? fokusHtml({ titel: "Zustellung bestätigen", kontext: `${nach.name}, ${nach.adresse}`, knopf: "Zugestellt", act: "log-zustellen" })
           : fokusHtml({ zustand: true, titel: "Zugestellt", kontext: `${nach.name}, ${fmtUhr(L.zugestellt)}` });
       inhalt = taste + `<section class="karte"><h2 class="ktitel">Abholen bei</h2><p class="text">${esc(von.name)}</p><p class="neben">${esc(von.adresse)}</p></section>
         <section class="karte ziel-karte"><h2 class="ktitel">Liefern an</h2><p class="text">${esc(nach.name)}</p><p class="neben">${esc(nach.adresse)}</p></section>`;
@@ -2369,7 +2370,7 @@ body { font-variant-numeric: tabular-nums; }
     const x = findAnm(a, ui.offeneAnmerkung);
     if (!x) return { kopf: "", body: "" };
     const ok = darfSehen(a, x), ag = state.ich === "AG";
-    const wohin = x.art === "stopp" ? "an Auftraggeber" : x.art === "entscheidung" ? `betrifft Station ${x.bezug}` : x.art === "hinweis" ? `an Station ${x.bezug}` : "Serie";
+    const wohin = x.art === "stopp" ? "an den Auftraggeber" : x.art === "entscheidung" ? `betrifft Station ${x.bezug}` : x.art === "hinweis" ? `an Station ${x.bezug}` : "Serie";
     const stufe = ag && !x.rueckfrage
       ? `<button class="artpill gross a-${x.art}" type="button" data-act="stufe-aendern" aria-expanded="${!!ui.stufeAendern}" aria-label="Stufe ändern, jetzt ${artName(x)}">${chip(x.art, "s")}${artName(x)}</button>`
       : `<span class="artpill gross a-${x.art}">${chip(x.art, "s")}${artName(x)}</span>`;
@@ -2577,7 +2578,7 @@ body { font-variant-numeric: tabular-nums; }
         <section class="karte">${zeilen || '<p class="leer">Noch keine Unterlagen.</p>'}</section>`;
     } else if (i === 4) {
       if (p.traeger) {
-        body = `<div class="status fertig"><span class="ico">${ICO.haken}</span><div><p class="t">Träger ${p.traeger} gekoppelt</p><p class="u">Auftrag und Träger gehören jetzt zusammen.</p></div></div>
+        body = `<div class="status fertig"><span class="ico">${ICO.haken}</span><div><p class="t">Träger ${p.traeger} gekoppelt</p></div></div>
           <button class="textbtn" type="button" data-act="p-scan-neu">Anderen Träger scannen</button>`;
       } else {
         body = `<div class="sucher"><span style="color:var(--pri)">${ICO.code}</span><span class="ecke e1"></span><span class="ecke e2"></span><span class="ecke e3"></span><span class="ecke e4"></span></div>
@@ -3790,7 +3791,7 @@ body { font-variant-numeric: tabular-nums; }
     if (nach < E) post("AG", a, { titel: `Station ${me} abgeschlossen`, text: `Auftrag ${a.id}, Träger abholbereit` }, false);
     ui.blatt = "zu"; ui.blattHoehe = "peek"; ui.ansicht = null;
     render();
-    grosseMeldung("Logistik benachrichtigt", `${LOGISTIK.name} holt den Träger bei Ihnen ab und bringt ihn zu ${zu.titel === "Auftraggeber" ? "Auftraggeber" : zu.titel}, ${zu.name}.`,
+    grosseMeldung("Logistik benachrichtigt", `${LOGISTIK.name} holt den Träger bei Ihnen ab und bringt ihn ${zu.titel === "Auftraggeber" ? "zum Auftraggeber" : "zu " + zu.titel}, ${zu.name}.`,
       `Station ${me} abgeschlossen um ${fmtUhr(s.fertig)}`);
   }
 
@@ -4012,7 +4013,7 @@ body { font-variant-numeric: tabular-nums; }
     schliesseAlles();
     ui.ebene = "traeger"; ui.ansicht = null; ui.bauteil = null;
     render();
-    grosseMeldung("Alle Betriebe benachrichtigt", "Jeder Betrieb sieht jetzt seinen Schritt und kann Rückfragen stellen.", `Auftrag ${a.id} ist angelegt`, ICO.haken40);
+    grosseMeldung("Alle Betriebe benachrichtigt", "Die Betriebe prüfen jetzt die Unterlagen.", `Auftrag ${a.id} ist angelegt`, ICO.haken40);
   }
 
   /* Die Werkstatt bestätigt ihre Unterlagen ohne Rückfrage. Haben alle bestätigt, kann der Auftraggeber starten. */
@@ -4864,7 +4865,7 @@ body { font-variant-numeric: tabular-nums; }
   }
   /* Neue Fassung erkennen: Ein offener Tab holt sich die neue Fassung, sobald er wieder in den Vordergrund kommt
      (zum Beispiel nach einem Scan, bei dem Safari nur den alten Tab nach vorn holt). */
-  const BUILD = "20261127183222";
+  const BUILD = "20261127190302";
   let fassungGeprueft = 0;
   async function pruefeFassung() {
     if (!/^\d+$/.test(BUILD) || !/^https?:$/.test(location.protocol) || Date.now() - fassungGeprueft < 4000) return;
